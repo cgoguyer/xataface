@@ -58,11 +58,12 @@ class Dataface_ImportFilter {
 	 * @param $name The name of the filter.
 	 * @param $label The label of the filter.
 	 */
-	function Dataface_ImportFilter( $tablename, $name, $label ){
+	function __construct( $tablename, $name, $label ){
 		$this->_table =& Dataface_Table::loadTable($tablename);
 		$this->label = $label;
 		$this->name = $name;
 	}
+		function Dataface_ImportFilter($tablename, $name, $label) { self::__construct($tablename, $name, $label); }
 	
 	
 	/**
@@ -74,8 +75,9 @@ class Dataface_ImportFilter {
 	function import(&$data, $defaultValues=array()){
 	
 		$delegate =& $this->_table->getDelegate();
-		if ( $delegate !== null and method_exists($delegate, '__import__'.$this->name) ){
-			return call_user_func(array(&$delegate,'__import__'.$this->name), $data, $defaultValues);
+		$methodName = '__import__'.$this->name;
+		if ( $delegate !== null and method_exists($delegate, $methodName) ){
+			return $delegate->$methodName($data, $defaultValues);
 		}
 	
 	}

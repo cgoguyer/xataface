@@ -71,7 +71,7 @@ class Dataface_RecordGrid {
 	var $actionCellCallbacks = array();
 	var $cellFilters = array();
 	
-	function Dataface_RecordGrid(&$records, $columns=null, $labels=null){
+	function __construct(&$records, $columns=null, $labels=null){
 		$this->records =& $records;
 		if ( !is_array($this->records) ){
 			throw new Exception('In Dataface_RecordGrid the first parameter is expected to be an array but received "'.get_class($records).'"', E_USER_ERROR);
@@ -80,13 +80,14 @@ class Dataface_RecordGrid {
 		$this->columns = $columns;
 		$this->labels = $labels;
 	}
+		function Dataface_RecordGrid(&$records, $columns=null, $labels=null) { self::__construct($records, $columns, $labels); }
 	
 	function addActionCellCallback($callback){
 		$this->actionCellCallbacks[] = $callback;
 	}
 	
 	function toHTML(){
-		import('Dataface/SkinTool.php');
+		import(XFROOT.'Dataface/SkinTool.php');
 		$recKeys = array_keys($this->records);
 		$sampleRecord =& $this->records[$recKeys[0]];
 		if ( $this->columns === null ){

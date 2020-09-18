@@ -25,7 +25,7 @@
  * Description:	Class to convert SQL queries into multlingual queries based
  * on table naming conventions.
  */
-import('Dataface/Table.php');
+import(XFROOT.'Dataface/Table.php');
 
 class Dataface_QueryTranslator {
 	var $app;
@@ -65,7 +65,7 @@ class Dataface_QueryTranslator {
 	function translateWhereClause($func, $lang=null){}
 	*/
 	
-	function Dataface_QueryTranslator($lang=null){
+	function __construct($lang=null){
 		$this->app =& Dataface_Application::getInstance();
 		if ( !isset($lang) ) $lang = $this->app->_conf['lang'];
 		$this->_lang = $lang;
@@ -76,14 +76,15 @@ class Dataface_QueryTranslator {
 			// behavior can be reversed by adding the default_language_no_fallback=1
 			// flag to the conf.ini file.
 			
-			import('SQL/Parser.php');
+			import(XFLIB.'SQL/Parser.php');
 			$this->_parser = new SQL_Parser( null, 'MySQL');
-			import('SQL/Compiler.php');
+			import(XFLIB.'SQL/Compiler.php');
 			$this->_compiler =& SQL_Compiler::newInstance('mysql');
 			$this->_compiler->version = 2;
 		//}
 		
 	}
+		function Dataface_QueryTranslator($lang=null) { self::__construct($lang); }
 	
 	/**
 	 * IF this translator is meant to work within the context of another translator,

@@ -30,8 +30,8 @@
  * A form that allows users to add new records to a relationship.
  *
  */
-import('HTML/QuickForm.php');
-import('Dataface/QuickForm.php');
+import(XFLIB.'HTML/QuickForm.php');
+import(XFROOT.'Dataface/QuickForm.php');
 /**
  * @ingroup formsAPI
  */
@@ -104,7 +104,7 @@ class Dataface_ShortRelatedRecordForm extends HTML_QuickForm {
 	 * 		@type string
 	 * @param db A database resource handle.
 	 */
-	function Dataface_ShortRelatedRecordForm(&$record, $relationshipName, $db='', $fieldNames=null){
+	function __construct(&$record, $relationshipName, $db='', $fieldNames=null){
 		$app =& Dataface_Application::getInstance();
 		if ( is_a($record, 'Dataface_Record') ){
 			/*
@@ -148,6 +148,7 @@ class Dataface_ShortRelatedRecordForm extends HTML_QuickForm {
 			$this->_fieldNames =& $fieldNames;
 		}
 	}
+		function Dataface_ShortRelatedRecordForm(&$record, $relationshipName, $db='', $fieldNames=null) { self::__construct($record, $relationshipName, $db, $fieldNames); }
 
 	
 	/**
@@ -295,7 +296,6 @@ class Dataface_ShortRelatedRecordForm extends HTML_QuickForm {
 			
 			$groupEmpty = true; // A flag to check when the group has at least one element
 			
-			
 			foreach ( $fields as $field){
 				$tablename = $field['tablename'];
 				$fieldname = $field['name'];
@@ -305,11 +305,12 @@ class Dataface_ShortRelatedRecordForm extends HTML_QuickForm {
 				unset($thisTable);
 				$thisTable =& Dataface_Table::loadTable($tablename);
 			
-				if ( isset($r[$thisTable->tablename]['readonly']) ) continue;
+				if ( isset($r[$thisTable->tablename]['readonly']) ){
+                    continue;
+                }
 				if ( !isset($this->_quickForms[$tablename]) ) $this->_quickForms[$tablename] = new Dataface_QuickForm($tablename,'','','',true);
 				if (isset($quickForm) ) unset($quickForm);
 				$quickForm =& $this->_quickForms[$tablename];
-			
 			
 			
 				if ( array_key_exists($tablename, $fkCols) and array_key_exists($fieldname, $fkCols[$tablename]) ){
@@ -574,6 +575,9 @@ class Dataface_ShortRelatedRecordForm extends HTML_QuickForm {
 				// Reference to the table object where this field resides
 			
 			if ( isset($quickForm) ) unset($quickForm);
+            if (!isset($this->_quickForms[$tablename])) {
+                continue;
+            }
 			$quickForm =& $this->_quickForms[$tablename];
 				// QuickForm object for this field's table.
 			

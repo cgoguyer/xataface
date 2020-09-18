@@ -164,3 +164,137 @@ function updateSelected(tableid){var ids=getSelectedIds(tableid);if(ids.length==
 var form=document.getElementById("result_list_selected_items_form");form.elements['--selected-ids'].value=ids.join("\n");form.elements['-action'].value='copy_replace';form.submit();}
 function removeSelectedRelated(tableid){var ids=getSelectedIds(tableid);if(ids.length==0){alert("Please first check boxes beside the records you wish to remove, and then press 'Remove'.");return;}
 var form=document.getElementById("result_list_selected_items_form");form.elements['--selected-ids'].value=ids.join("\n");form.elements['-action'].value='remove_related_record';form.submit();}
+(function() {
+    
+    // Mobile stuff now
+    var mobileActivated = false;
+    function xfHandleResize() {
+        var body = document.querySelector('body');
+        if (!body) return;
+        if (window.innerWidth < 768) {
+            if (body.classList.contains('large') || !body.classList.contains('small')) {
+                body.classList.add('small');
+                body.classList.remove('large');
+                window.dispatchEvent(new Event('xf-mobileenter'));
+            }
+            
+            mobileActivated = true;
+        } else {
+            if (body.classList.contains('small') || !body.classList.contains('large')) {
+                body.classList.remove('small');
+                body.classList.add('large');
+                window.dispatchEvent(new Event('xf-mobileexit'));
+            }
+            
+        }
+    }
+    xfHandleResize();
+    window.addEventListener('DOMContentLoaded', xfHandleResize);
+    window.addEventListener('resize', xfHandleResize);
+
+    var paddingTopExplicit = false;
+    var paddingBottomExplicit = false;
+    var viewport = {
+        top : 0,
+        left : 0,
+        right : 0,
+        bottom : 0,
+        width : window.innerWidth,
+        height : window.innerHeight
+         
+    };
+    function updateBodyPadding() {
+
+        if (!mobileActivated) {
+            return;
+        }
+        var body = document.querySelector('body');
+        var changed = false;
+        if (!body.classList.contains('small')) {
+            changed = paddingTopExplicit || paddingBottomExplicit;
+            body.style.paddingBottom = null;
+            body.style.paddingTop = null;
+            paddingTopExplicit = paddingBottomExplicit = false;
+            viewport.top = viewport.bottom = viewport.left = viewport.right = 0;
+            viewport.width = window.innerWidth;
+            viewport.height = window.innerHeight;
+        } else {
+
+            var footer = document.querySelector('.mobile-footer');
+            var buttons = document.querySelector('.button-section');
+            if (footer || buttons) {
+                var offsetHeight = 0;
+                if (footer) offsetHeight = footer.offsetHeight;
+                if (buttons) offsetHeight = Math.max(offsetHeight, buttons.offsetHeight);
+                if (body.style.paddingBottom != offsetHeight+'px') {
+                    changed = true;
+                }
+                body.style.paddingBottom = offsetHeight + 'px';
+                viewport.bottom = offsetHeight;
+                viewport.height = window.innerHeight - viewport.bottom - viewport.top;
+                viewport.width = window.innerWidth;
+                explicitBottomPadding = true;
+            }
+            
+            var header = document.querySelector('.mobile-header');
+            if (header) {
+                if (body.style.paddingTop != header.offsetHeight+'px') {
+                    changed = true;
+                }
+                body.style.paddingTop = header.offsetHeight + 'px';
+                viewport.top = header.offsetHeight;
+                viewport.height = window.innerHeight - viewport.top - viewport.bottom;
+                viewport.width = window.innerWidth;
+                explicitBottomPadding = true;
+            }
+            
+        }
+        
+        if (changed) {
+            var event = new Event('xf-viewport-changed');
+            window.dispatchEvent(event);
+        }
+        
+    }
+    
+    function getViewport() {
+        return Object.assign({}, viewport);
+    }
+    window.xataface = window.xataface || {};
+    Object.defineProperty(window.xataface, 'viewport', {
+        get: getViewport,
+        configurable: false,
+        enumerable: false
+    });
+    window.addEventListener('DOMContentLoaded', updateBodyPadding);
+    window.addEventListener('load', updateBodyPadding);
+    setInterval(updateBodyPadding, 1000);
+    
+})();
+
+(function() {
+    // browser detection
+    function iOS() {
+            
+      return [
+        'iPad Simulator',
+        'iPhone Simulator',
+        'iPod Simulator',
+        'iPad',
+        'iPhone',
+        'iPod'
+      ].includes(navigator.platform)
+      // iPad on iOS 13 detection
+      || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
+    }
+    
+    function addUserAgentCSSClass() {
+        if (iOS()) {
+            document.body.classList.add('iphone');
+        }
+    }
+    window.addEventListener('DOMContentLoaded', addUserAgentCSSClass);
+    
+})();
+
+

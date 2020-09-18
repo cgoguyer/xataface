@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *-------------------------------------------------------------------------------
  */
-import('HTML/QuickForm.php');
+import(XFLIB.'HTML/QuickForm.php');
 class Dataface_ValuelistEditorForm extends HTML_QuickForm {
 	var $table;
 	var $valuelistName;
@@ -26,12 +26,13 @@ class Dataface_ValuelistEditorForm extends HTML_QuickForm {
 	var $widgetID;
 	var $_built = false;
 	
-	function Dataface_ValuelistEditorForm($tablename, $valuelistName, $widgetID=null){
+	function __construct($tablename, $valuelistName, $widgetID=null){
 		$this->table =& Dataface_Table::loadTable($tablename);
 		$this->valuelistName = $valuelistName;
 		$this->values = $this->table->getValuelist($this->valuelistName);
 		$this->widgetID = $widgetID;
 	}
+		function Dataface_ValuelistEditorForm($tablename, $valuelistName, $widgetID=null) { self::__construct($tablename, $valuelistName, $widgetID); }
 	
 	function _build(){
 		if ( $this->_built ) return;

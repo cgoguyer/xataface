@@ -31,16 +31,28 @@
  */
 class dataface_actions_edit {
 	function handle(&$params){
-		import( 'Dataface/FormTool.php');
-		import( 'Dataface/QuickForm.php');
+		import( XFROOT.'Dataface/FormTool.php');
+		import( XFROOT.'Dataface/QuickForm.php');
 		$formTool =& Dataface_FormTool::getInstance();
-		
-				
+        		
 		$app =& Dataface_Application::getInstance();
 		$query =& $app->getQuery();
 		$resultSet =& $app->getResultSet();
 		
 		$currentRecord =& $app->getRecord();
+        
+        $app->addBodyCSSClass('no-table-tabs');
+        $app->addBodyCSSClass('no-mobile-header');
+        $app->addBodyCSSClass('no-fab');
+        $app->addBodyCSSClass('no-record-heading');
+    
+		
+        
+		if (!$currentRecord) {
+		    if (@$query['--recordid']) {
+		        $currentRecord = df_get_record_by_id($query['--recordid']);
+		    }
+		}
 		$currentTable =& Dataface_Table::loadTable($query['-table']);
 		if ( !isset($query['--tab']) and count($currentTable->tabs($currentRecord)) > 1 ){
 		   $tabs = $currentTable->tabs($currentRecord);
@@ -63,9 +75,9 @@ class dataface_actions_edit {
 		 *
 		 */
 		//$form = new Dataface_QuickForm($query['-table'], $app->db(),  $query);
-		
-		
-		if ( $resultSet->found()> @$query['-cursor']){
+		if ($currentRecord){
+		//if ($resultSet->found()> @$query['-cursor']){
+
 			$form = $formTool->createRecordForm($currentRecord, false, @$query['--tab'], $query, $includedFields);
 			/*
 			 * There is either a result to edit, or we are creating a new record.
@@ -103,7 +115,6 @@ class dataface_actions_edit {
 			$form->addElement('hidden', '-query');
 			$form->setDefaults( array( '-action'=>$query['-action'],'-query'=>$_SERVER['QUERY_STRING']) );
 			
-			
 			/*
 			 * 
 			 * We have to deal with 3 cases.
@@ -123,17 +134,38 @@ class dataface_actions_edit {
 				 */
 				$app->clearMessages();
 				$formTool->handleTabSubmit($currentRecord, $form, @$query['--tab']);
-				if ( !isset($query['--tab']) ){
-					// If we aren't using tabs we just do it the old way.
-					// (If it ain't broke don't fix it
-					
-					$result = $form->process( array( &$form, 'save') );
-				} else {
-					// If we are using tabs, we will use the formtool's 
-					// session aware saving function
-					
-					$result = $formTool->saveSession($currentRecord);
+				try {
+					if ( !isset($query['--tab']) ){
+						// If we aren't using tabs we just do it the old way.
+						// (If it ain't broke don't fix it
+						
+						$result = $form->process( array( &$form, 'save') );
+					} else {
+						// If we are using tabs, we will use the formtool's 
+						// session aware saving function
+						
+						$result = $formTool->saveSession($currentRecord);
+					}
+				} catch (xf\core\XFException $ex) {
+					if (@$query['-response'] === 'json') {
+						throw $ex;
+					} else {
+						$result = PEAR::raiseError($ex->getMessage(), $ex->getCode());
+					}
+				
+				} catch (Exception $ex) {
+					if (@$query['-response'] === 'json') {
+						throw $ex;
+					} else {
+						if (Dataface_Error::isNotice($ex)) {
+							$result = PEAR::raiseError($ex->getMessage(), $ex->getCode());
+						} else {
+							throw $ex;
+						}
+					}
 				}
+	
+				
 				$success = true;
 				$response =& Dataface_Application::getResponse();
 				
@@ -156,20 +188,29 @@ class dataface_actions_edit {
 
 					//$response['--msg'] = @$response['--msg'] ."\n".$result->getMessage();
 					$success = false;
+					if (@$query['-response'] == 'json') {
+						import(XFROOT.'xf/core/XFException.php');
+						throw new xf\core\XFException('Failed to insert record', $result->getCode(), new Exception($result->getMessage(), $result->getCode()));
+					}
 				}
 				
 				
 				if ( $success ){
-					if (@$query['-response'] and trim($query['-response']) === 'json' ){
+					
+					if (@$query['-response'] == 'json' ){
 						//header('Content-type: text/html; charset="'.$app->_conf['oe'].'"');
 						$rvals = $currentRecord->strvals();
 						$rvals['__title__'] = $currentRecord->getTitle();
 						$rvals['__id__'] = $currentRecord->getId();
-						echo df_escape(json_encode(array('response_code'=>200, 'record_data'=> $rvals, 'response_message'=>df_translate('Record Successfully Saved', 'Record Successfully Saved'))));
+						$json = json_encode(array('response_code'=>200, 'record_data'=> $rvals, 'response_message'=>df_translate('Record Successfully Saved', 'Record Successfully Saved')));
+						if (@$query['--escape-json'] != 'n') {
+						    $json = df_escape($json);
+						}
+						echo $json;
 						return;
 					}
 					
-					import('Dataface/Utilities.php');
+					import(XFROOT.'Dataface/Utilities.php');
 					Dataface_Utilities::fireEvent('after_action_edit', array('record'=>$form->_record));
 					/*
 					 *
@@ -178,6 +219,9 @@ class dataface_actions_edit {
 					 *
 					 */
 					$vals = $form->exportValues();
+                    if (@$vals['-query'] and $vals['-query']{0} != '?') {
+                        $vals['-query'] = '?' . $vals['-query'];
+                    }
 					$vals['-query'] = preg_replace('/[&\?]-new=[^&]+/i', '', $vals['-query']);
 					
 					$_SESSION['--last_modified_record_url'] = $form->_record->getURL();
@@ -193,18 +237,28 @@ class dataface_actions_edit {
 							"Record successfully saved.<br>"
 						).$msg
 					);
-					
+
+                    $editAction = Dataface_ActionTool::getInstance()->getAction(array('name'=>'edit'));
+                    if (@$editAction['after_action.'.$query['-table']]) {
+						$vals['-query'] = preg_replace('/([&\?])-action=[^&]+/', '$1-action='.$editAction['after_action.'.$query['-table']], $vals['-query']);
+					} else if (@$editAction['after_action']) {
+						$vals['-query'] = preg_replace('/([&\?])-action=[^&]+/', '$1-action='.$editAction['after_action'], $vals['-query']);
+                        
+					}
+                    
 					if ( preg_match('/[&\?]-action=edit&/', $vals['-query']) and !$form->_record->checkPermission('edit') ){
 						$vals['-query'] = preg_replace('/([&\?])-action=edit&/', '$1-action=view&', $vals['-query']);
 					} else if ( preg_match('/[&\?]-action=edit$/', $vals['-query']) and !$form->_record->checkPermission('edit') ){
 						$vals['-query'] = preg_replace('/([&\?])-action=edit$/', '$1-action=view', $vals['-query']);
 					}
 					$vals['-query'] = preg_replace('/&?--msg=[^&]*/', '', $vals['-query']);
-					$vals['-query'] = preg_replace('/&?--saved=[^&]*/', '', $vals['-query']);
                     if ( @$query['--lang'] ){
                         $vals['-query'] .= '&--lang='.$query['--lang'];
                     }
-					
+                    if ($vals['-query'] and $vals['-query']{0} == '?') {
+                        $vals['-query'] = substr($vals['-query'], 1);
+                    }
+                                        
 					$link = $_SERVER['HOST_URI'].DATAFACE_SITE_HREF.'?'.$vals['-query'].'&--saved=1&--msg='.$msg;
 					
 					

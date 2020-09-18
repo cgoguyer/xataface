@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *-------------------------------------------------------------------------------
  */
-import('Dataface/QuickForm.php');
+import(XFROOT.'Dataface/QuickForm.php');
 /**
  * @ingroup formsAPI
  */
@@ -44,7 +44,7 @@ class Dataface_TranslationForm extends Dataface_QuickForm {
 	 * @param $fieldnames Optional array of fields that are to be translated.
 	 *        By default all translatable fields will be translated.
 	 */
-	function Dataface_TranslationForm(&$record, $source=null, $dest=null, $query='', $fieldnames=null){
+	function __construct(&$record, $source=null, $dest=null, $query='', $fieldnames=null){
 		$app = Dataface_Application::getInstance();
 		
 		if ( is_string($record) ){
@@ -97,6 +97,7 @@ class Dataface_TranslationForm extends Dataface_QuickForm {
 		
 		
 	}
+		function Dataface_TranslationForm(&$record, $source=null, $dest=null, $query='', $fieldnames=null) { self::__construct($record, $source, $dest, $query, $fieldnames); }
 	
 	function loadRecords(){
 		$keyMissing = true;
@@ -162,7 +163,7 @@ class Dataface_TranslationForm extends Dataface_QuickForm {
 	function getFormTemplate(){
 		$atts = $this->_table->attributes();
 		
-		import('Dataface/TranslationTool.php');
+		import(XFROOT.'Dataface/TranslationTool.php');
 		$tt = new Dataface_TranslationTool();
 		
 		$status_selector_html = $tt->getHTMLStatusSelector($this->_record, $this->destinationLanguage,'__translation__[status]');
@@ -238,7 +239,7 @@ class Dataface_TranslationForm extends Dataface_QuickForm {
 	function save($values){
 		$res = parent::save($values);
 		
-		import('Dataface/TranslationTool.php');
+		import(XFROOT.'Dataface/TranslationTool.php');
 		$tt = new Dataface_TranslationTool();
 		$tt->setTranslationStatus($this->_record, $this->destinationLanguage, $_POST['__translation__']['status']);
 		return $res;

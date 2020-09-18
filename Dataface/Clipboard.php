@@ -1,10 +1,10 @@
 <?php
-import('Dataface/AuthenticationTool.php');
-import('Dataface/IO.php');
-define('Dataface_Clipboard_tablename', '_df_clipboard');
-define('Dataface_Clipboard_lifetime', 1800);
-define('Dataface_Clipboard_threshold', 20);
-define('Dataface_Clipboard_clipboard_id_key', '_df_clipboard_id');
+import(XFROOT.'Dataface/AuthenticationTool.php');
+import(XFROOT.'Dataface/IO.php');
+define(XFROOT.'Dataface_Clipboard_tablename', '_df_clipboard');
+define(XFROOT.'Dataface_Clipboard_lifetime', 1800);
+define(XFROOT.'Dataface_Clipboard_threshold', 20);
+define(XFROOT.'Dataface_Clipboard_clipboard_id_key', '_df_clipboard_id');
 
 /**
  * A clipboard class to enable users to cut and paste records between relationships
@@ -17,9 +17,10 @@ class Dataface_Clipboard {
 	var $warnings;
 	var $messages;
 	
-	function Dataface_Clipboard($id){
+	function __construct($id){
 		$this->id = $id;
 	}
+		function Dataface_Clipboard($id) { self::__construct($id); }
 
 	/**
 	 * Checks whether the clipboard is currently installed.

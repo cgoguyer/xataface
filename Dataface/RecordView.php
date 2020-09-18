@@ -1,5 +1,5 @@
 <?php
-import('Dataface/GlanceList.php');
+import(XFROOT.'Dataface/GlanceList.php');
 class Dataface_RecordView {
 	var $record;
 	
@@ -11,7 +11,7 @@ class Dataface_RecordView {
 	var $status;
 	var $showLogo = false; // Whether or not to show the logo spot
 	
-	function Dataface_RecordView(&$record){
+	function __construct(&$record){
 
 		$this->record =& $record;
 		$tablename = $this->record->_table->tablename;
@@ -44,7 +44,7 @@ class Dataface_RecordView {
 			$this->status = '';
 		}
 		
-		import('Dataface/PreferencesTool.php');
+		import(XFROOT.'Dataface/PreferencesTool.php');
 		$pt =& Dataface_PreferencesTool::getInstance();
 
 		$prefs =& $pt->getPreferences($record->getId());
@@ -117,7 +117,7 @@ class Dataface_RecordView {
 			}
 			if ( $record->_table->isMetaField($field['name']) ) continue;
 			
-			if ( !@$app->prefs['hide_record_view_logo'] ){
+			if ( false and !@$app->prefs['hide_record_view_logo'] ){
 				if ( ($record->isImage($field['name']) and @$field['logo'] !== '0') or @$field['logo']) {
 					$this->showLogo = true;
 					
@@ -315,6 +315,7 @@ class Dataface_RecordView {
 		
 		
 	}
+		function Dataface_RecordView(&$record) { self::__construct($record); }
 	
 	
 	

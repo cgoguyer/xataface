@@ -1,6 +1,6 @@
 <?php
 
-import('HTML/QuickForm/text.php');
+import(XFLIB.'HTML/QuickForm/text.php');
 
 class HTML_QuickForm_yui_autocomplete extends HTML_QuickForm_text {
 	var $options=array();
@@ -12,7 +12,7 @@ class HTML_QuickForm_yui_autocomplete extends HTML_QuickForm_text {
 	var $scriptQueryParam='-search';
 	
 	
-	function HTML_QuickForm_yui_autocomplete($elementName=null, $elementLabel=null, $attributes=null, $properties=null){
+	function __construct($elementName=null, $elementLabel=null, $attributes=null, $properties=null){
 		parent::HTML_QuickForm_text($elementName, $elementLabel, $attributes);
 		$this->updateAttributes(array(
 			'df:cloneable'=>1, 
@@ -24,6 +24,7 @@ class HTML_QuickForm_yui_autocomplete extends HTML_QuickForm_text {
 		
 	
 	}
+    	function HTML_QuickForm_yui_autocomplete($elementName=null, $elementLabel=null, $attributes=null, $properties=null) { self::__construct($elementName, $elementLabel, $attributes, $properties); }
 	
 	/**
      * Returns the textarea element in HTML
@@ -74,7 +75,7 @@ END;
     		if ( $this->vocabularyName and !defined('HTML_QuickForm_yui_autocomplete_js_valuelists_'.$this->vocabularyName.'_loaded')){
     			define('HTML_QuickForm_yui_autocomplete_js_valuelists_'.$this->vocabularyName.'_loaded',1);
     			// We must be using in-memory arrays for the vocabulary
-    			import('Services/JSON.php');
+    			import(XFLIB.'Services/JSON.php');
     			$json = new Services_JSON();
     			$js_options = $json->encode(array_values($this->options));
     			$valuelistName = $this->vocabularyName;

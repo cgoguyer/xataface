@@ -2,24 +2,24 @@
 /*-------------------------------------------------------------------------------
  * Xataface Web Application Framework
  * Copyright (C) 2005-2008 Web Lite Solutions Corp (shannah@sfu.ca)
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *-------------------------------------------------------------------------------
  */
- 
- 
+
+
 if ( !function_exists('sys_get_temp_dir') )
 {
  // Based on http://www.phpit.net/
@@ -61,33 +61,33 @@ if ( !function_exists('sys_get_temp_dir') )
 }
 
 require_once dirname(__FILE__)."/../config.inc.php";
-import('Dataface/PermissionsTool.php');
-import('Dataface/LanguageTool.php');
+import(XFROOT.'Dataface/PermissionsTool.php');
+import(XFROOT.'Dataface/LanguageTool.php');
 define('DATAFACE_STRICT_PERMISSIONS', 100);
-	// the minimum security level that is deemed as strict permissions.  
-	// strict permissions mean that permissions must be explicitly granted to a 
+	// the minimum security level that is deemed as strict permissions.
+	// strict permissions mean that permissions must be explicitly granted to a
 	// table, record, or action or they will not be accessible
 
 /**
- * @brief The main Application object that handles requests and response. 
- * 
+ * @brief The main Application object that handles requests and response.
+ *
  * This is the one object that is presumed to always exist in a Dataface request.
  *
  *
  * @par Example 1
  *
- * Usage in the index.php file or entry point of an application.  In this context, the 
+ * Usage in the index.php file or entry point of an application.  In this context, the
  * application is merely loaded and called upon to display the application.
  *
  * @code
  * <?php
  * require_once 'xataface/public-api.php';
  * df_init(__FILE__, '/dataface')->display();
- * 
+ *
  * @endcode
  *
  * In the above example we're exploiting the fact that df_init() returns the
- * application object so we can call Dataface_Application::display() using method 
+ * application object so we can call Dataface_Application::display() using method
  * chaining.
  *
  * @par Obtaining the Dataface_Application Object
@@ -104,7 +104,7 @@ define('DATAFACE_STRICT_PERMISSIONS', 100);
  * The most common use of the application object is to get a reference to the current
  * request parameters.  Use Dataface_Application::getQuery() to get this as an associative
  * array.
- * 
+ *
  * @code
  * $app = Dataface_Application::getInstance();
  * $query =& $app->getQuery();
@@ -114,10 +114,10 @@ define('DATAFACE_STRICT_PERMISSIONS', 100);
  * @endcode
  *
  * @par Getting the Current Record
- * 
- * Each HTTP request should resolve to context which includes a current record.  The 
- * current record is decided by <a href="http://xataface.com/wiki/URL_Conventions">Xataface URL Conventions</a>.  
- * It will either be decided by the -recordid parameter, or the current filter combined with 
+ *
+ * Each HTTP request should resolve to context which includes a current record.  The
+ * current record is decided by <a href="http://xataface.com/wiki/URL_Conventions">Xataface URL Conventions</a>.
+ * It will either be decided by the -recordid parameter, or the current filter combined with
  * the -cursor parameter (although there are some other possiblities.
  *
  * @code
@@ -147,12 +147,12 @@ class Dataface_Application {
 END;
 
 	const EX_FAILED_TO_CREATE_SESSION_DIR = 5500;
-	
-	
+
+
 	/**
 	 * @brief An object that implements a method named 'redirect' that is
 	 *  supposed to handle requests to redirect to a new page.  This
-	 *  gives an opportunity to suppress redirects or handle them differently 
+	 *  gives an opportunity to suppress redirects or handle them differently
 	 *  inline.  This is helpful if you're loading Xataface from a cron script
 	 *  or another application and need to prevent redirects.
 	 *
@@ -170,20 +170,131 @@ END;
 	 * @endcode
 	 *
 	 * Note that if your handler does not either throw an exception or exit execution, then
-	 * Xataface will throw a Dataface_Application_RedirectException which can be caught 
+	 * Xataface will throw a Dataface_Application_RedirectException which can be caught
 	 * higher up the call stack.
 	 *
 	 */
 	public $redirectHandler = null;
-	
+
 	private $pageTitle = null;
+
+	/**
+	 * Array of UI libraries that have been loaded.
+	 */
+	private $uiLibraries = array();
+	public $UI_LIBRARY_PATH = null;
+	
+	/**
+	 * Gets the UI library search path - the paths where it will
+	 * search for UI libraries.
+	 * @return string Paths separated by path separator char.
+	 */
+	public function getUILibraryPath() {
+	    if ($this->UI_LIBRARY_PATH === null) {
+	        $this->UI_LIBRARY_PATH = XFAPPROOT.'uilibs' . PATH_SEPARATOR .XFROOT.'uilibs';
+	    }
+		return $this->UI_LIBRARY_PATH;
+	}
+
+	/**
+	 * Sets the search paths to look for UI libraries.
+	 * @param string $path  A path in format like PATH or LD_LIBRARY_PATH.  Paths separated by PATH_SEPARATOR.  (e.g. semicolon on windows, and colon on unix).
+	 */
+	public function setUILibraryPath($path) {
+		$this->UI_LIBRARY_PATH = $path;
+	}
+
+	/**
+	 * Appends path to the UI library search paths.
+	 * @param string $path The path to add.
+	 * @return void.
+	 */
+	public  function appendUILibraryPath($path) {
+		$this->UI_LIBRARY_PATH = $this->getUILibraryPath() .PATH_SEPARATOR . $path;
+	}
+
+	/**
+	 * Prepends path to the UI library search paths.
+	 * @param string $path The path to add.
+	 * @return void
+	 */
+	public  function prependUILibraryPath($path) {
+		$this->UI_LIBRARY_PATH = $path . PATH_SEPARATOR . $this->getUILibraryPath();
+	}
+
+	/**
+	 * Gets the search paths that will be searched to load
+	 * UI libraries, as an array.
+	 * 
+	 * @return array Array of paths to directories to search for uilibs.
+	 */
+	public  function getUILibraryPaths() {
+		return explode(PATH_SEPARATOR, $this->getUILibraryPath());
+	}
+
+	/**
+	 * Loads a UI library.  A UI library consists of a file
+	 * located at uilibs/$name/$name.uilib.html.  This file will 
+	 * be included in the head of the document, so it should
+	 * contain an HTML snippet that loads the necessary CSS and javascript
+	 * files for the UI library to work.
+	 * 
+	 * The $name.uilib.html file should use the {{LIBROOT}} placeholder
+	 * as the URL to the uilib's directory so that it knows how to reference
+	 * its CSS and Javascript files.
+	 * 
+	 * @param string $name The name of the UI library to load.
+	 * @return boolean True if the library was loaded.  False otherwise.
+	 */
+	public function loadUILibrary($name) {
+		if (!isset($this->uiLibraries[$name])) {
+			$this->uiLibraries[$name] = $name;
+			
+			
+			foreach ($this->getUILibraryPaths() as $p) {
+				
+				if (strpos($p, XFAPPROOT) === 0) {
+					$baseUrl = DATAFACE_SITE_URL;
+					$basePath = XFAPPROOT;
+				} else if (strpos($p, XFROOT) === 0) {
+					$baseUrl = DATAFACE_URL;
+					$basePath = XFROOT;
+				} else {
+					continue;
+				}
+				if (strlen($baseUrl) == 0) {
+					$baseUrl = '/';
+				}
+				if (substr($baseUrl, -1) != "/") {
+					$baseUrl .= '/';
+				}
+
+				$filePath = $p.DIRECTORY_SEPARATOR.$name.DIRECTORY_SEPARATOR.$name.'.uilib.html';
+				//echo "Filepath: $filePath;";
+				//echo "BaseUrl: $baseUrl;";
+				if (file_exists($filePath)) {
+
+					$fileUrl = $baseUrl .
+						substr($filePath, strlen($basePath));
+					$fileUrl = str_replace(DIRECTORY_SEPARATOR, '/', $fileUrl);
+					$libRoot = substr($fileUrl, 0, strrpos($fileUrl, '/'));
+					$content = file_get_contents($filePath);
+					$content = str_replace('{{LIBROOT}}', $libRoot, $content);
+					$this->addHeadContent($content);
+					return true;
+				}
+
+			}
+		}
+		return false;
+	}
 
 	/**
 	 * @private
 	 */
 	var $sessionCookieKey;
 
-	
+
 	/**
 	 * @private
 	 */
@@ -198,30 +309,30 @@ END;
 	 * @private
 	 */
 	var $_tables = array();
-	
+
 	/**
 	 * An associative array of all of the tables in the database.
 	 * @private
 	 */
 	var $tableIndex = array();
-	
+
 	/**
 	 * The base url of the site.
 	 * @private
 	 */
 	var $_baseUrl;
-	
+
 	/**
 	 * @private
 	 */
 	var $_currentTable;
-	
-	
+
+
 	/**
 	 * @private
 	 */
 	var $memcache;
-	
+
 	/**
 	 * Database resource handle.
 	 * @private
@@ -234,35 +345,35 @@ END;
 	 * @private
 	 */
 	var $_query;
-	
+
 	/**
 	 * @var array The raw request variables straight from $_REQUEST. The only difference
 	 * 	between this array and $_REQUEST is that the $_REQUEST[-__keys__] array
 	 *  will be used to override key variables for the current table.
-	 * 
+	 *
 	 */
 	var $rawQuery;
-	
+
 	/**
 	 * @private
 	 */
 	var $queryTool = null;
-	
+
 	/**
 	 * @private
 	 */
 	var $currentRecord = null;
-	
+
 	/**
 	 * @private
 	 */
 	var $recordContext = null;
-	
+
 	/**
 	 * @private
 	 */
 	var $_customPages;
-	
+
 	/**
 	 * An array of locations that have been visited.  The keys
 	 * are md5 encodings of the values so that the location can be passed
@@ -270,7 +381,7 @@ END;
 	 * @private
 	 */
 	var $locations = null;
-	
+
 	/**
 	 * Registered listeners for various events in the application.
 	 * of the form [Event_name] -> array([callback1], [callback2], ...)
@@ -279,10 +390,10 @@ END;
 	 *
 	 */
 	var $eventListeners = array();
-	
-	
+
+
 	var $version = 2;
-	
+
 	/**
 	 * @brief User preferences matrix.
 	 */
@@ -301,30 +412,31 @@ END;
 		'show_record_tabs' => 1,		// View, Edit, Translate, History, etc...
 		'show_record_tree' => 1,		// Tree to navigate the relationships of this record.
 		'list_view_scroll_horizontal'=>1, // Whether to scroll list horizontal if it exceeds page width
-		'list_view_scroll_vertical'=>1	// Whether to scroll list vertical if it exceeds page height.
-	
+		'list_view_scroll_vertical'=>1,	// Whether to scroll list vertical if it exceeds page height.
+		'disable_master_detail' => 1
+
 	);
-	
+
 	/**
-	 * @brief Keeps track of the table names used in the current request. -- just so 
+	 * @brief Keeps track of the table names used in the current request. -- just so
 	 * we know the breadth of the request.
 	 * @private
 	 */
 	var $tableNamesUsed = array();
-	
+
 	/**
 	 * @brief Keeps track of files used in the current request -- jus so we know the
 	 *	breadth of the request.  This can be used by caching schemes.
 	 */
 	var $filesUsed = array();
-	
+
 	/**
 	 * @private
 	 */
 	var $main_content_only = false;
-		// IF true then output only includes main content - not the 
+		// IF true then output only includes main content - not the
 		// surrounding frame.
-	
+
 	/**
 	 * Reference to the delegate object for this application.  The delegate class is an optional
 	 * class that can be placed in the conf/ApplicationDelegate.php file with the class name
@@ -332,29 +444,29 @@ END;
 	 * @private
 	 */
 	var $delegate = -1;
-	
-	
-	
+
+
+
 	/**
 	 * @private
 	 */
 	var $errors=array();
-	
+
 	/**
 	 * @private
 	 */
 	var $messages = array();
-	
+
 	/**
 	 * @private
 	 */
 	var $debugLog = array();
-	
+
 	/**
 	 * @private
 	 */
 	var $authenticationTool = null;
-	
+
 	/**
 	 * An array of text that is to be inserted into the head of the template.
 	 * This allows a more efficient method for adding a custom javascript or
@@ -362,24 +474,24 @@ END;
 	 * @private
 	 */
 	var $headContent=array();
-	
+
 	/**
 	 * The mysql version info.
 	 * @private
 	 *
 	 */
 	var $mysqlVersion = null;
-	
-	
-	
+
+
+
 	// @{
 	/**
 	 * @name Languages
-	 * 
+	 *
 	 * Methods for dealing with multiple languages.
 	 */
-	
-	
+
+
 	/**
 	 * Associative array to map locales to a language code.
 	 * This is necessary because Xataface only uses 2-digits language
@@ -387,8 +499,8 @@ END;
 	 * must map to real locales.
 	 *
 	 * E.g. Xataface uses zt to mean traditional chinese, but zh
-	 * for simplified chinese.  This array will map the 
-	 * zh_CN locale to the zh code and the zh_TW, and zh_HK codes to 
+	 * for simplified chinese.  This array will map the
+	 * zh_CN locale to the zh code and the zh_TW, and zh_HK codes to
 	 * zt.
 	 *
 	 * These values can be supplemented or overridden using the '_locales'
@@ -401,9 +513,9 @@ END;
 		'zh_HK'=>'zt',
 		'en_US'=>'en'
 	);
-	
+
 	/**
-	 * Associative array to map non-standard language codes to their 
+	 * Associative array to map non-standard language codes to their
 	 * corresponding language.
 	 *
 	 * These values can be supplemented or overridden using the '_language_codes'
@@ -414,7 +526,7 @@ END;
 	var $_languages = array(
 		'zt'=>'zh'
 	);
-	
+
 	/**
 	 * @brief Returns the language associated with a given language code.
 	 * @param string $langCode  The 2-digit xataface language code. May be non-standard.
@@ -448,7 +560,7 @@ END;
 			return $langCode;
 		}
 	}
-	
+
 	/**
 	 * @brief Returns the Xataface language code for a particular locale.
 	 * E.g. zh_CN would return zh, while zh_TW would return zt.
@@ -460,7 +572,7 @@ END;
 	 * @code
 	 *	echo $app->getLanguageCode('zh_TW');
 	 * @endcode
-	 * 
+	 *
 	 * @par Outputs:
 	 * @code
 	 *	zh
@@ -474,12 +586,12 @@ END;
 			return $langCode;
 		}
 	}
-	
+
 	/**
 	 * @brief Returns an array of all available languages in the application.
 	 * This is derived from all languages listed in the [languages] section
 	 * of the conf.ini file.
-	 * 
+	 *
 	 * @return array Array of 2-digit xataface language codes.
 	 * @since 1.0
 	 *
@@ -489,7 +601,7 @@ END;
 	 *	en=English
 	 *  fr=French
 	 * @endcode
-	 * 
+	 *
 	 * @par Example Inputs:
 	 * @code
 	 * $app->getAvailableLanguages();
@@ -513,64 +625,78 @@ END;
 			$out[$this->getLanguage($lang)] = true;
 		}
 		return array_keys($out);
-		
-	}
-	
 
-	
-	
+	}
+
+
+
+
 	// @}
 	// END LANGUAGES
-	
-	
+
+
 	// @{
 	/**
 	 * @name Configuration & Initialization
-	 * 
+	 *
 	 * Methods and Data Structures for Storing and Accessing Configuration.
 	 */
-	
-	
+
+
 	/**
 	 * @brief Returns MySQL connection resource.
 	 */
 	function db(){ return $this->_db;}
-	
+
 	/**
 	 * @brief A configuration array to store configuration information.
 	 */
 	var $_conf;
-	
-	/**
+
+    /**
 	 * @brief Constructor.  Do not use this.  getInstance() instead.
 	 */
 	function Dataface_Application($conf = null){
+		self::__construct($conf);
+	}
+
+	/**
+	 * @brief Constructor.  Do not use this.  getInstance() instead.
+	 */
+	function __construct($conf = null) {
 		if ( !isset($this->sessionCookieKey) ){
 		    $this->sessionCookieKey = md5(DATAFACE_SITE_URL.'#'.__FILE__);
 		}
 		$this->_baseUrl  = $_SERVER['PHP_SELF'];
 		if ( !is_array($conf) ) $conf = array();
-		if ( is_readable(DATAFACE_SITE_PATH.'/conf.ini') ){
-			$conf = array_merge(parse_ini_file(DATAFACE_SITE_PATH.'/conf.ini', true), $conf);
+        $configPath = DATAFACE_SITE_PATH.'/conf.ini.php';
+        if (!is_readable($configPath)) {
+            $configPath = DATAFACE_SITE_PATH.'/conf.ini';
+        }
+		if ( is_readable($configPath) ){
+			$conf = array_merge(parse_ini_file($configPath, true), $conf);
 			if ( @$conf['__include__'] ){
 				$includes = array_map('trim',explode(',', $conf['__include__']));
 				foreach ($includes as $i){
+                                        
 					if ( is_readable($i) ){
 						$conf = array_merge($conf, parse_ini_file($i, true));
+					} else if ( is_readable($i.'.php') ){
+						$conf = array_merge($conf, parse_ini_file($i.'.php', true));
 					}
 				}
 			}
 		}
-		
-		
-		
+
+
+
 		if ( !isset( $conf['_tables'] ) ){
 			throw new Exception('Error loading config file.  No tables specified.', E_USER_ERROR);
 
 		}
 
-		
-		
+
+
 		if ( isset( $conf['db'] ) and is_resource($conf['db']) ){
 			$this->_db = $conf['db'];
 		} else {
@@ -579,6 +705,9 @@ END;
 
 			}
 			$dbinfo =& $conf['_database'];
+			if (is_array($dbinfo) and defined('XATAFACE_DATABASE_NAME_OVERRIDE')) {
+			    $dbinfo['name'] = XATAFACE_DATABASE_NAME_OVERRIDE;
+			}
 			if ( !is_array( $dbinfo ) || !isset($dbinfo['host']) || !isset( $dbinfo['user'] ) || !isset( $dbinfo['password'] ) || !isset( $dbinfo['name'] ) ){
 				throw new Exception('Error loading config file.  The database information was not entered correctly.<br>
 					 Please enter the database information int its own section of the config file as follows:<br>
@@ -592,13 +721,15 @@ END;
 
 			}
 			if ( !isset($dbinfo['driver']) ){
-				$dbinfo['driver'] = 'mysql';
+				// It's time to move to mysqli as the default database driver.
+				// this might break old apps.
+				$dbinfo['driver'] = 'mysqli';
 			}
 			require_once 'xf/db/drivers/'.basename($dbinfo['driver']).'.php';
 			//if ( @$dbinfo['persistent'] ){
 			//	$this->_db = xf_db_pconnect( $dbinfo['host'], $dbinfo['user'], $dbinfo['password'] );
 			//} else {
-			
+
 			$this->_db = xf_db_connect( $dbinfo['host'], $dbinfo['user'], $dbinfo['password'] );
 			//}
 			if ( !$this->_db ){
@@ -609,8 +740,8 @@ END;
 			xf_db_select_db( $dbinfo['name'], $this->_db) or die("Could not select DB: ".xf_db_error($this->_db));
 		}
 		//if ( !defined( 'DATAFACE_DB_HANDLE') ) define('DATAFACE_DB_HANDLE', $this->_db);
-		
-		
+
+
 		if ( !is_array( $conf['_tables'] ) ){
 			throw new Exception("<pre>
 				Error reading table information from the config file.  Please enter the table information in its own section
@@ -621,15 +752,15 @@ END;
 				</pre>");
 
 		}
-		
+
 		$this->_tables = $conf['_tables'];
-		
-		
-		
+
+
+
 		if ( count($this->_tables) <= 10 ){
 			$this->prefs['horizontal_tables_menu'] = 1;
 		}
-		
+
 		// We will register a _cleanup method to run after code execution is complete.
 		register_shutdown_function(array(&$this, '_cleanup'));
 
@@ -644,18 +775,18 @@ END;
 				}
 				$this->memcache = new Memcache;
 				$this->memcache->connect($conf['_memcache']['host'], $conf['_memcache']['port']) or die ("Could not connect to memcache on port 11211");
-				
+
 			}
 		}
-		
+
 		//
 		// -------- Set up the CONF array ------------------------
 		$this->_conf = $conf;
-		
+
 		if ( !isset($this->_conf['_disallowed_tables']) ){
 			$this->_conf['_disallowed_tables'] = array();
 		}
-		
+
 		$this->_conf['_disallowed_tables']['history'] = '/__history$/';
 		$this->_conf['_disallowed_tables']['cache'] = '__output_cache';
 		$this->_conf['_disallowed_tables']['dataface'] = '/^dataface__/';
@@ -663,20 +794,24 @@ END;
 		if ( !@$this->_conf['_modules'] or !is_array($this->_conf['_modules']) ){
 			$this->_conf['_modules'] = array();
 		}
-		
+
 		// Include XataJax module always.
 		$mods = array('modules_XataJax'=>'modules/XataJax/XataJax.php');
-		if ( !@$this->_conf['disable_g2'] ){
-			$mods['modules_g2'] = 'modules/g2/g2.php';
-		}
+
+		// We used to make g2 the default, but
+		// starting with version 3.0, we will be going back to the default
+		// look - which is improved.
+		//if ( !@$this->_conf['disable_g2'] ){
+		//	$mods['modules_g2'] = 'modules/g2/g2.php';
+		//}
 		foreach ($this->_conf['_modules'] as $k=>$v){
 			$mods[$k] = $v;
 		}
 		$this->_conf['_modules'] = $mods;
-		
-		
+
+
 		if ( isset($this->_conf['_modules'])  and count($this->_conf['_modules'])>0 ){
-			import('Dataface/ModuleTool.php');
+			import(XFROOT.'Dataface/ModuleTool.php');
 		}
 
 		if ( isset($this->_conf['languages']) ){
@@ -685,71 +820,77 @@ END;
 				$this->_conf['languages'][$lang_code] = $lang_code;
 			}
 		}
-		
+
 		if ( @$this->_conf['support_transactions'] ){
 			// We will support transactions
 			@xf_db_query('SET AUTOCOMMIT=0', $this->_db);
 			@xf_db_query('START TRANSACTION', $this->_db);
-		
+
+		}
+
+		if (@$this->_conf['_database']['sql_mode']) {
+			xf_db_query('SET sql_mode="'.addslashes($this->_conf['_database']['sql_mode']).'"', $this->_db);
+		} else {
+			xf_db_query('SET sql_mode=""', $this->_db);
 		}
 		if ( !isset($this->_conf['default_ie']) ) $this->_conf['default_ie'] = 'UTF-8';
 		if ( !isset($this->_conf['default_oe']) ) $this->_conf['default_oe'] = 'UTF-8';
 		if ( isset( $this->_conf['multilingual_content']) || isset($this->_conf['languages']) ){
 			$this->_conf['oe'] = 'UTF-8';
 			$this->_conf['ie'] = 'UTF-8';
-			
+
 			if (function_exists('mb_substr') ){
 				// The mbstring extension is loaded
 				ini_set('mbstring.internal_encoding', 'UTF-8');
 				//ini_set('mbstring.encoding_translation', 'On');
 				ini_set('mbstring.func_overload', 7);
-				
+
 			}
-			
+
 			if ( !isset($this->_conf['languages']) ){
 				$this->_conf['languages'] = array('en'=>'English');
 			}
 			if ( !isset($this->_conf['default_language']) ){
 				if ( count($this->_conf['languages']) > 0 )
 					$this->_conf['default_language'] = reset($this->_conf['languages']);
-					
-				else 
+
+				else
 					$this->_conf['default_language'] = 'en';
-					
+
 			}
-			
+
 		} else {
 			$this->_conf['oe'] = $this->_conf['default_oe'];
 			$this->_conf['ie'] = $this->_conf['default_ie'];
 		}
-		
+
                 define('XF_OUTPUT_ENCODING', $this->_conf['oe']);
-                
+
 		if ( $this->_conf['oe'] == 'UTF-8' ){
 			$res = xf_db_query('set character_set_results = \'utf8\'', $this->_db);
 			xf_db_query("SET NAMES utf8", $this->_db);
 		}
 		if ( $this->_conf['ie'] == 'UTF-8' ){
 			$res = xf_db_query('set character_set_client = \'utf8\'', $this->_db);
-			
+
 		}
-		
-		
+
+
 		if ( isset($this->_conf['use_cache']) and $this->_conf['use_cache'] and !defined('DATAFACE_USE_CACHE') ){
 			define('DATAFACE_USE_CACHE', true);
 		}
-		
+
 		if ( isset($this->_conf['debug']) and $this->_conf['debug'] and !defined('DATAFACE_DEBUG') ){
 			define('DATAFACE_DEBUG', true);
 		} else if ( !defined('DATAFACE_DEBUG') ){
 			define('DATAFACE_DEBUG',false);
 		}
-		
+
 		if ( !@$this->_conf['config_storage'] ) $this->_conf['config_storage'] = DATAFACE_DEFAULT_CONFIG_STORAGE;
 			// Set the storage type for config information.  It can either be stored in ini files or
 			// in the database.  Database will give better performance, but INI files may be simpler
 			// to manage for simple applications.
-		
+
 		if ( !isset($this->_conf['garbage_collector_threshold']) ){
 			/**
 			 * The garbage collector threshold is the number of seconds that "garbage" can
@@ -758,95 +899,95 @@ END;
 			 */
 			$this->_conf['garbage_collector_threshold'] = 10*60;
 		}
-		
+
 		if ( !isset($this->_conf['multilingual_content']) ) $this->_conf['multilingual_content'] = false;
 			// whether or not the application will use multilingual content.
 			// multilingual content enables translated versions of content to be stored in
 			// tables using naming conventions.
 			// Default to false because this takes a performance hit (sql queries take roughly twice
 			// as long because they have to be parsed first.
-		
+
 		if ( !isset($this->_conf['cookie_prefix']) ) $this->_conf['cookie_prefix'] = 'dataface__';
-		
+
 		if ( !isset($this->_conf['security_level']) ){
 			// Default security is strict if security is not specified.  This change is effectivce
-			// for Dataface 0.6 .. 0.5.3 and earlier had a loose permissions model by default that 
+			// for Dataface 0.6 .. 0.5.3 and earlier had a loose permissions model by default that
 			// could be tightened using delegate classes.
 			$this->_conf['security_level'] = 0; //DATAFACE_STRICT_PERMISSIONS;
 		}
-		
-		
+
+
 		if ( !isset($this->_conf['default_action']) ){
 			// The default action defines the action that should be set if no
 			// other action is specified.
 			$this->_conf['default_action'] = 'list';
 		}
-		
+
 		if ( !isset($this->_conf['default_browse_action']) ){
 			$this->_conf['default_browse_action'] = 'view';
 		}
-		
-		
+
+
 		if ( !isset($this->_conf['default_mode'] ) ) $this->_conf['default_mode'] = 'list';
-		
+
 		if ( !isset($this->_conf['default_limit']) ){
 			$this->_conf['default_limit'] = 30;
 		}
-		
+
 		if ( !isset($this->_conf['default_table'] ) ){
 			// The default table is the table that is used if no other table is specified.
 			foreach ($this->_tables as $key=>$value){
 				$this->_conf['default_table'] = $key;
-				
+
 				break;
 			}
 		}
-		
+
 		if ( !isset($this->_conf['auto_load_results']) ) $this->_conf['auto_load_results'] = false;
-		
+
 		if ( !isset( $this->_conf['cache_dir'] ) ){
 			if ( ini_get('upload_tmp_dir') ) $this->_conf['cache_dir'] = ini_get('upload_tmp_dir');
 			else $this->_conf['cache_dir'] = '/tmp';
 		}
-		
+
 		if ( !isset( $this->_conf['default_table_role'] ) ){
-			
+
 			if ( $this->_conf['security_level'] >= DATAFACE_STRICT_PERMISSIONS ){
 				$this->_conf['default_table_role'] = 'NO ACCESS';
 			} else {
 				$this->_conf['default_table_role'] = 'ADMIN';
 			}
-			
+
 		}
-		
+
 		if ( !isset( $this->_conf['default_field_role'] ) ){
 			if ( $this->_conf['security_level'] >= DATAFACE_STRICT_PERMISSIONS ){
 				$this->_conf['default_field_role'] = 'NO ACCESS';
 			} else {
 				$this->_conf['default_field_role'] = 'ADMIN';
-				
+
 			}
 		}
-		
+
 		if ( !isset( $this->_conf['default_relationship_role'] ) ){
 			if ( $this->_conf['security_level'] >= DATAFACE_STRICT_PERMISSIONS ){
 				$this->_conf['default_relationship_role'] = 'READ ONLY';
 			} else {
 				$this->_conf['default_relationship_role'] = 'ADMIN';
-				
+
 			}
 		}
-		
+
 		if ( !isset( $this->_conf['languages'] ) ) $this->_conf['languages'] = array('en');
 		else if ( !is_array($this->_conf['languages']) ) $this->_conf['languages'] = array($this->_conf['languages']);
-		
+
 		if ( isset($this->_conf['_language_codes']) ){
 			$this->_languages = array_merge($this->_languages, $this->_conf['_language_codes']);
 		}
 		if ( isset($this->_conf['_locales']) ){
 			$this->_locales = array_merge($this->_locales, $this->_conf['_locales']);
 		}
-		
+
 		// Set the language.
 		// Language is stored in a cookie.  It can be changed by passing the -lang GET var with the value
 		// of a language.  e.g. fr, en, cn
@@ -860,25 +1001,33 @@ END;
 			$_REQUEST['-lang'] = basename($_REQUEST['-lang']);
 			$this->_conf['lang'] = $_REQUEST['-lang'];
 			if ( @$_COOKIE[$prefix.'lang'] !== $_REQUEST['-lang'] ){
-				setcookie($prefix.'lang', $_REQUEST['-lang'], null, '/');
+				if (php_sapi_name() === 'cli') {
+					//fwrite(STDERR, "\nNOTICE: Running in CLI mode mode, so not setting language cookie\n");
+				} else {
+					setcookie($prefix.'lang', $_REQUEST['-lang'], null, '/');
+				}
 			}
 		} else if (isset( $_COOKIE[$prefix.'lang']) ){
 			$this->_conf['lang'] = $_COOKIE[$prefix.'lang'];
 		} else {
-			import('I18Nv2/I18Nv2.php');
+			import(XFLIB.'I18Nv2/I18Nv2.php');
 			$negotiator = I18Nv2::createNegotiator($this->_conf['default_language'], 'UTF-8');
 			$this->_conf['lang'] = $this->getLanguageCode(
 				$negotiator->getLocaleMatch(
 					$this->getAvailableLanguages()
 				)
 			);
-			setcookie($prefix.'lang', $this->_conf['lang'], null, '/');
+			if (php_sapi_name() === 'cli') {
+				//fwrite(STDERR, "\nNOTICE: Running in CLI mode so not setting the lang cookie.\n");
+			} else {
+				setcookie($prefix.'lang', $this->_conf['lang'], null, '/');
+			}
 		}
-		
+
 		$this->_conf['lang'] = basename($this->_conf['lang']);
                 $this->addHeadContent('<script>XF_LANG="'.htmlspecialchars($this->_conf['lang']).'";</script>');
-		
-                
+
+
                 if ( isset($_REQUEST['-template']) ){
                     $_REQUEST['-template'] = basename($_REQUEST['-template']);
                 }
@@ -888,7 +1037,7 @@ END;
                 if ( isset($_POST['-template']) ){
                     $_POST['-template'] = basename($_POST['-template']);
                 }
-		
+
 		// Set the mode (edit or view)
 		if ( isset($_REQUEST['-usage_mode'] )){
 			$this->_conf['usage_mode'] = $_REQUEST['-usage_mode'];
@@ -900,18 +1049,20 @@ END;
 		} else if ( !isset($this->_conf['usage_mode']) ){
 			$this->_conf['usage_mode'] = 'view';
 		}
-		
+
 		define('DATAFACE_USAGE_MODE', $this->_conf['usage_mode']);
-		
+
 		if ( @$this->_conf['enable_workflow'] ){
-			import('Dataface/WorkflowTool.php');
+			import(XFROOT.'Dataface/WorkflowTool.php');
 		}
-		
-		
-		
-		
-		// ------- Set up the current query ---------------------------------
-		
+
+		if (@$_GET['--url']) {
+			import(XFROOT.'actions/request_public_url.php');
+			// This allows the use of a public URL for setting
+			// both the query and the logged in user.
+			dataface_actions_request_public_url::apply_url($this);
+		}
+
 		if ( isset($_REQUEST['__keys__']) and is_array($_REQUEST['__keys__']) ){
 			$query = $_REQUEST['__keys__'];
 			foreach ( array_keys($_REQUEST) as $key ){
@@ -932,7 +1083,7 @@ END;
 		if ( @$query['-table'] ){
 			$query['-table'] = trim($query['-table']);
 			if ( !preg_match('/^[a-zA-Z0-9_]+$/', $query['-table']) ){
-				throw new Exception("Illegal table name.");
+				throw new Exception("Illegal table name: ".$query['-table']);
 			}
 			$query['-table'] = basename($query['-table']);
 		}
@@ -943,7 +1094,7 @@ END;
 			}
 			$query['-lang'] = basename($query['-lang']);
 		}
-		
+
 		if ( @$query['--lang'] ){
 			$query['--lang'] = trim($query['--lang']);
 			if ( !preg_match('/^[a-zA-Z0-9]{2}$/', $query['--lang']) ){
@@ -951,7 +1102,7 @@ END;
 			}
 			$query['--lang'] = basename($query['--lang']);
 		}
-		
+
 		if ( @$query['-theme'] ){
 			$query['-theme'] = trim($query['-theme']);
 			if ( !preg_match('/^[a-zA-Z0-9_]+$/', $query['-theme']) ){
@@ -959,7 +1110,7 @@ END;
 			}
 			$query['-theme'] = basename($query['-theme']);
 		}
-		
+
 		if ( @$query['-cursor']){
 			$query['-cursor'] = intval($query['-cursor']);
 		}
@@ -977,29 +1128,67 @@ END;
 				throw new Exception("Illegal relationship name.");
 			}
 		}
-		
-		
-		
-		
+
+
+
+
 		$this->rawQuery = $query;
-		
+
 		if ( !isset( $query['-table'] ) ) $query['-table'] = $this->_conf['default_table'];
 		$this->_currentTable = $query['-table'];
-		
-		
+
+
 		if ( !@$query['-action'] ) {
 			$query['-action'] = $this->_conf['default_action'];
+            if (@$this->_conf['default_action.'.$this->_currentTable]) {
+                $query['-action'] = $this->_conf['default_action.'.$this->_currentTable];
+            }
+            
 			$this->_conf['using_default_action'] = true;
 		}
-		
+        if (@$this->_conf['using_default_action'] and isset($this->_conf['default_params.'.$this->_currentTable])) {
+            $defaultParams = $this->_conf['default_params.'.$this->_currentTable];
+            if (is_string($defaultParams)) {
+                parse_str($defaultParams, $defaultParams);
+
+            }
+            if (is_array($defaultParams)) {
+                foreach ($defaultParams as $k=>$v) {
+                    if (!isset($query[$k])) {
+                        $query[$k] = $v;
+                    }
+                    
+                }
+            } 
+        }
+
 		$query['--original_action'] = $query['-action'];
 		if ( $query['-action'] == 'browse') {
+            if (@$this->_conf['default_browse_params.'.$this->_currentTable]) {
+                $defaultParams = $this->_conf['default_browse_params.'.$this->_currentTable];
+                if (is_string($defaultParams)) {
+                    parse_str($defaultParams, $defaultParams);
+
+                }
+                if (is_array($defaultParams)) {
+                    foreach ($defaultParams as $k=>$v) {
+                        if (!isset($query[$k])) {
+                            $query[$k] = $v;
+                        }
+                    
+                    }
+                } 
+            }
+            
 			if ( isset($query['-relationship']) ){
 				$query['-action'] = 'related_records_list';
 			} else if ( isset($query['-new']) and $query['-new']) {
 				$query['-action'] = 'new';
 			} else {
 				$query['-action'] = $this->_conf['default_browse_action']; // for backwards compatibility to 0.5.x
+                if (@$this->_conf['default_browse_action.'.$this->_currentTable]) {
+                    $query['-action'] = $this->_conf['default_browse_action.'.$this->_currentTable];
+                }
 			}
 		} else if ( $query['-action'] == 'find_list' ){
 			$query['-action'] = 'list';
@@ -1007,39 +1196,39 @@ END;
 		if ( !isset( $query['-cursor'] ) ) $query['-cursor'] = 0;
 		if ( !isset( $query['-skip'] ) ) $query['-skip'] = 0;
 		if ( !isset( $query['-limit'] ) ) $query['-limit'] = $this->_conf['default_limit'];
-		
+
 		if ( !isset( $query['-mode'] ) ) $query['-mode'] = $this->_conf['default_mode'];
 		$this->_query =& $query;
-		
-		
+
+
 		if ( isset( $query['--msg'] ) ) {
-			$query['--msg'] = preg_replace('#<[^>]*>#','', $query['--msg']);
+			$query['--msg'] = htmlspecialchars($query['--msg']);
 			if ( preg_match('/^@@$/', $query['--msg']) ){
-				
+
 				if ( @$_SESSION['--msg'] ){
 					$this->addMessage(@$_SESSION['--msg']);
 					unset($_SESSION['--msg']);
 				}
 			} else {
-				
+
 				$this->addMessage($query['--msg']);
 			}
 		}
-		
-		
-		
-		
+
+
+
+
 		if ( isset($query['--error']) and trim($query['--error']) ){
-			$query['--error'] = preg_replace('#<[^>]*>#','', $query['--error']);
+			$query['--error'] = htmlspecialchars($query['--error']);
 			$this->addError(PEAR::raiseError($query['--error']));
 		}
-		
+
 		// Now allow custom setting of theme
 		if ( isset($query['-theme']) ){
 			if ( !isset($this->_conf['_themes']) ) $this->_conf['_themes'] = array();
 			$this->_conf['_themes'][basename($query['-theme'])] = 'themes/'.basename($query['-theme']);
 		}
-		
+
 		// Check to see if we should set a custom default preview length
 		if ( isset($query['--default-preview-length']) ){
 			$len = intval($query['--default-preview-length']);
@@ -1047,18 +1236,18 @@ END;
 				define('XATAFACE_DEFAULT_PREVIEW_LENGTH', $len);
 			}
 		}
-		
-		
+
+
 
 	}
-	
-	
+
+
 	/**
 	 * @brief Returns reference to the singleton instance of this class.
 	 *
-	 * @param array $conf Optional configuration associative array that matches the 
+	 * @param array $conf Optional configuration associative array that matches the
 	 * 	stucture of the conf.ini file.  This parameter will only be considered the
-	 *  first time this method is called in the request. 
+	 *  first time this method is called in the request.
 	 *
 	 * @return Dataface_Application
 	 * @since 0.6
@@ -1080,11 +1269,15 @@ END;
 				define('DATAFACE_APPLICATION_LOADED', true);
 			}
 		}
-		
+
 		return $instance[0];
 	}
-	
-	
+
+
+	/**
+	 * Adds javascript strings for use in javascript internationalization.
+	 * @param array(string=>string) $strings
+	 */
 	public function addJSStrings($strings){
 	    $jsStrings = json_encode($strings);
 	    $this->addHeadContent(<<<END
@@ -1106,20 +1299,20 @@ END;
 END
 );
 	}
-	
-	
+
+
 	/**
-	 * @brief Returns the config array as loaded from the conf.ini file, except that 
+	 * @brief Returns the config array as loaded from the conf.ini file, except that
 	 * it opens up the opportunity for the delegate class to load values into
 	 * the config using its own conf() method.
-	 * 
+	 *
 	 * This is useful if an application wants to store config information in
 	 * the database and still make it available to the application.
 	 *
 	 * @returns array
 	 *
 	 */
-	function &conf(){	
+	function &conf(){
 		static $loaded = false;
 		if ( !$loaded ){
 			$loaded = true;
@@ -1138,15 +1331,29 @@ END
 						$this->_conf[$key] = $val;
 					}
 				}
-				
+
 			}
-			
+
 		}
 		return $this->_conf;
-		
+
 	}
-	
-	
+
+
+    /**
+     * Returns the application version as reported in the version.txt file.  This only
+     * returns the build version, which is the 2nd component of the version in version.txt
+     * Value is returned as an int.
+     *
+     * If no version is supplied, this will return 0
+     * 
+     * @return int The application version number.
+     */
+    function getApplicationVersion() {
+        return df_get_file_system_version();
+        
+    }
+    
 	/**
 	 * @brief Get the mysql major version number of MySQL.
 	 * returns int
@@ -1158,41 +1365,41 @@ END
 		list($mv) = explode('.',$this->mysqlVersion);
 		return intval($mv);
 	}
-	
-	function getPageTitle(){
+
+	function getPageTitle($mode='desktop'){
 		if ( isset($this->pageTitle) ){
 			return $this->pageTitle;
 		} else {
-			$title = $this->getSiteTitle();
+			$title = $mode == 'mobile' ? '' : $this->getSiteTitle();
 			$query =& $this->getQuery();
 			if ( ($record = $this->getRecord()) && $query['-mode'] == 'browse'  ){
-                return $record->getTitle().' - '.$title;
+                return $record->getTitle().($title?(' - '.$title):'');
             } else {
                 $tableLabel = Dataface_Table::loadTable($query['-table'])->getLabel();
-                return $tableLabel.' - '.$title;
-                
+                return $tableLabel.($title?(' - '.$title):'');
+
             }
 		}
 	}
-	
+
 	function setPageTitle($title){
 		$this->pageTitle = $title;
 	}
-	
-	
+
+
 	/**
 	 * @brief Gets the site title.
 	 *
 	 * @returns string The site title.
 	 *
-	 * If $app->_conf['title'] is set then this will just return that.  If not 
+	 * If $app->_conf['title'] is set then this will just return that.  If not
 	 * it will determine an appropriate title based on the current record and
 	 * the current table.
 	 */
 	function getSiteTitle(){
 		$query =& $this->getQuery();
 		$title = 'Dataface Application';
-		 
+
 		if ( isset($this->_conf['title']) ) {
 			try {
 				$title = $this->parseString($this->_conf['title']);
@@ -1201,23 +1408,23 @@ END
 			}
 		}
 		return $title;
-		
-	
+
+
 	}
-	
-	
+
+
 	// @}
 	// END CONFIGURATION
-	
-	
+
+
 	// @{
 	/**
 	 * @name Request Context
-	 * 
+	 *
 	 * Methods and Structures for getting information about the current request context.
 	 *
 	 */
-	
+
 	/**
 	 * @brief Returns a reference to the current query object.  This is very similar to the $_GET
 	 * and $_REQUEST globals except this array has been filled in with missing values.
@@ -1236,9 +1443,9 @@ END
 	function &getQuery(){
 		return $this->_query;
 	}
-	
+
 	/**
-	 * @brief Returns a query parameter.  
+	 * @brief Returns a query parameter.
 	 *
 	 * @param string $key The query parameter to obtain.  This should omit the leading '-'
 	 * in the parameter name.   E.g. Instead of '-action' this will be 'action'.
@@ -1268,7 +1475,7 @@ END
 			return $null;
 		}
 	}
-	
+
 	/**
 	 * @brief Loads the current result set.
 	 * @returns Dataface_QueryTool
@@ -1281,13 +1488,13 @@ END
 				// Do whatever we need to do before the request is handled.
 				$applicationDelegate->beforeLoadResultSet();
 			}
-			import('Dataface/QueryTool.php');
+			import(XFROOT.'Dataface/QueryTool.php');
 			$this->queryTool = Dataface_QueryTool::loadResult($this->_query['-table'], $this->db(), $this->_query);
 		}
 		return $this->queryTool;
-	
+
 	}
-	
+
 	/**
 	 * @brief Gets the current record based on the current query.
 	 *
@@ -1299,7 +1506,7 @@ END
 	 * -# It then checks for the --__keys__ parameter and uses these keys as a filter.
 	 * -# It then checks for the --recordid parameter and returns the specified record.
 	 * -# It then checks for the -recordid parameter and returns the specified record.
-	 * -# It then loads the current result set and returns the record specified by the 
+	 * -# It then loads the current result set and returns the record specified by the
 	 *		-cursor parameter (which is default 0).
 	 *
 	 * @par The --no-query Parameter
@@ -1329,8 +1536,8 @@ END
 	 * $rec = $app->getRecord() // Record with user_id 11
 	 * @endcode
 	 *
-	 * 
-	 * 
+	 *
+	 *
 	 */
 	function &getRecord(){
 		$null = null;
@@ -1363,7 +1570,7 @@ END
 		if ( $this->currentRecord === -1 || !$this->currentRecord ) return $null;
 		return $this->currentRecord;
 	}
-	
+
 	/**
 	 * @brief Returns the related record that forms a context for the specified
 	 * record id.  A context is provided so that we can tell if a record
@@ -1390,7 +1597,7 @@ END
 						$this->recordContext[$destRec->getId()] = $rrec;
 					}
 				}
-				
+
 			}
 		}
 		if ( !isset($id) ){
@@ -1399,7 +1606,7 @@ END
 			return @$this->recordContext[$id];
 		}
 	}
-	
+
 	/**
 	 * @brief Adds a related record to the current context.  This provides
 	 * a lense through which to view the destination records of this related
@@ -1420,11 +1627,11 @@ END
 		}
 		Dataface_PermissionsTool::addContextMask($rec);
 	}
-	
-	
+
+
 	/**
 	 * @brief Clears the current record context.  The record context is a set
-	 * of related records that are meant to be used as a lense through which 
+	 * of related records that are meant to be used as a lense through which
 	 * to view any destination records of any related record in the set.
 	 *
 	 * @since 2.0
@@ -1439,9 +1646,9 @@ END
 			unset($contextMasks[$k]);
 		}
 	}
-	
+
 	/**
-	 * @brief Checks is the current record has been loaded yet.  
+	 * @brief Checks is the current record has been loaded yet.
 	 *
 	 * @returns boolean
 	 *
@@ -1450,8 +1657,8 @@ END
 	function recordLoaded(){
 		return ( $this->currentRecord !== null);
 	}
-	 
-	 
+
+
 	/**
 	 * @brief Gets the settings array for the current action as specified
 	 * by the -action parameter of the current query.
@@ -1459,20 +1666,20 @@ END
 	 * @return array Action parameters (or null if action doesn't exist).
 	 */
 	function &getAction(){
-		import('Dataface/ActionTool.php');
+		import(XFROOT.'Dataface/ActionTool.php');
 		$actionTool = Dataface_ActionTool::getInstance();
 		return $actionTool->getAction(array('name'=>$this->_query['-action']));
 	}
-	
+
 	/**
 	 * @brief Gets the name of the action that should be used as a search target from the given
 	 * 	action context.  If $action is omitted, then the current action (specified by the -action
 	 *	query parameter) will be used as the current context.
 	 *
 	 * <p>This method is used by the find form and the search form to figure out which action should
-	 * be used to show the search results when performing a find.   Before this method, searches 
+	 * be used to show the search results when performing a find.   Before this method, searches
 	 * would always go to the list view, but as the list of modules grow, there are many other
-	 * actions that might be appropriate for showing search results.  Most notably, if you are 
+	 * actions that might be appropriate for showing search results.  Most notably, if you are
 	 * viewing an action that "lists" a found set and you perform a search, you would expect
 	 * to remain in the action/view from which you initiated the search.  Previously
 	 * they would have been kicked back to list view, which may not be desirable.</p>
@@ -1480,7 +1687,7 @@ END
 	 * <h3>How Search Target Is Determined</h3>
 	 *
 	 * <ol>
-	 *	<li>If the DelegateClass::getSearchTarget() method is implemented, its result will be 
+	 *	<li>If the DelegateClass::getSearchTarget() method is implemented, its result will be
 	 *		used.
 	 *	</li>
 	 *	<li>If the ApplicationDelegateClass::getSearchTarget() method is implemented, its result
@@ -1505,7 +1712,7 @@ END
 	function getSearchTarget(array $action=null){
 		if ( !isset($action) ){
 			$action = $this->getAction();
-			
+
 			if ( !isset($action) or !is_array($action)){
 				if ( @$this->_conf['default_search_target'] ) return $this->_conf['default_search_target'];
 				else return 'list';
@@ -1513,34 +1720,34 @@ END
 				return $this->getSearchTarget($action);
 			}
 		} else {
-		
+
 			$table = Dataface_Table::loadTable($this->_query['-table']);
 			$tableDel = $table->getDelegate();
 			$method = 'getSearchTarget';
 			if ( isset($tableDel) and method_exists($tableDel, $method) ){
 				return $tableDel->$method($action);
 			}
-			
+
 			$appDel = $this->getDelegate();
 			if ( isset($appDel) and method_exists($appDel, $method) ){
 				return $appDel->$method($action);
 			}
-			
-			
+
+
 			if ( @$action['search_target'] ){
 				return $action['search_target'];
 			} else {
 				if ( @$this->_conf['default_search_target'] ) return $this->_conf['default_search_target'];
 				else return 'list';
 			}
-		
+
 		}
-	
+
 	}
-	 
+
 	// @}
 	// END Request Context
-	
+
 	// @{
 	/**
 	 * @name Session Handling
@@ -1548,11 +1755,11 @@ END
 	 * Methods and data structures for dealing with Session Handling and authentication.
 	 *
 	 */
-	 
-	 
+
+
 	/**
-	 * @brief Sets a message to be displayed as an info/alert the next time a 
-	 * page is rendered.  This is handy if your action is performing some 
+	 * @brief Sets a message to be displayed as an info/alert the next time a
+	 * page is rendered.  This is handy if your action is performing some
 	 * funcitons and then redirecting to a new page on complete - and you
 	 * want the message to be displayed on the other page.
 	 *
@@ -1567,9 +1774,9 @@ END
 	function saveMessage($str){
 		$_SESSION['--msg'] = $str;
 	}
-	
+
 	/**
-	 * @brief Sets the cookie that causes sessions to be enabled by default.  
+	 * @brief Sets the cookie that causes sessions to be enabled by default.
 	 * In order to maximize performance Xataface will try not to start a
 	 * session until it absolutely has to .  This allows public sites
 	 * to not rack up huge amounts of Session files unnecessarily.
@@ -1580,7 +1787,7 @@ END
 	function enableSessions(){
 		setcookie($this->sessionCookieKey, 1, 0, DATAFACE_SITE_URL);
 	}
-	
+
 	/**
 	 * @brief Unsets the cookie that causes sessions to be enabled by default.  Despite
 	 * the name, this doesn't actually disable sessions.  Sessions will still be enabled
@@ -1593,7 +1800,7 @@ END
 	function disableSessions(){
 		setcookie($this->sessionCookieKey, 1, time()-3600*25, DATAFACE_SITE_URL);
 	}
-	
+
 	/**
 	 * @brief Checks if sessions are enabled by default.
 	 * @returns boolean
@@ -1603,12 +1810,47 @@ END
 	 * @see startSession()
 	 */
 	function sessionEnabled(){
-		return @$_COOKIE[$this->sessionCookieKey];
+		return @$_COOKIE[$this->sessionCookieKey] or $this->getBearerToken() !== null;
 	}
-	
+
+	/** 
+	 * Get header Authorization
+	 * */
+	private function getAuthorizationHeader(){
+			$headers = null;
+			if (isset($_SERVER['Authorization'])) {
+				$headers = trim($_SERVER["Authorization"]);
+			}
+			else if (isset($_SERVER['HTTP_AUTHORIZATION'])) { //Nginx or fast CGI
+				$headers = trim($_SERVER["HTTP_AUTHORIZATION"]);
+			} elseif (function_exists('apache_request_headers')) {
+				$requestHeaders = apache_request_headers();
+				// Server-side fix for bug in old Android versions (a nice side-effect of this fix means we don't care about capitalization for Authorization)
+				$requestHeaders = array_combine(array_map('ucwords', array_keys($requestHeaders)), array_values($requestHeaders));
+				//print_r($requestHeaders);
+				if (isset($requestHeaders['Authorization'])) {
+					$headers = trim($requestHeaders['Authorization']);
+				}
+			}
+			return $headers;
+		}
+	/**
+	 * get access token from header
+	 * */
+	private function getBearerToken() {
+		$headers = $this->getAuthorizationHeader();
+		// HEADER: Get the access token from the header
+		if (!empty($headers)) {
+			if (preg_match('/Bearer\s(\S+)/', $headers, $matches)) {
+				return $matches[1];
+			}
+		}
+		return null;
+	}
+
 	/**
 	 * @brief Starts a session if one does not already exist.  If you are writing code
-	 * that needs to use session data it is a good idea to explicitly call this before 
+	 * that needs to use session data it is a good idea to explicitly call this before
 	 * doing anything with the $_SESSION array.  It is safe to call this multiple times.
 	 *
 	 * @param array $conf Optional configuration data that should follow the format
@@ -1623,17 +1865,30 @@ END
 		if ( !$this->sessionEnabled() ){
 		    $this->enableSessions();
 		}
-		if ( session_id() == "" ){
+		$bearerToken = $this->getBearerToken();
+		$sessionFromBearer = false;
+		if (session_id() == "" and $bearerToken) {
+			// We'll allow users to keep the php session ID 
+			// in the bearer ID
+			$parts = explode('.', $bearerToken);
+			//echo "Parts[0] = {$parts[0]} vs ".md5('sessid');
+			if (count($parts) == 2 and $parts[0] == md5('sessid')) {
+				session_id(base64_decode($parts[1]));
+				$sessionFromBearer = true;
+			}
+			
+		}
+		if ( session_id() == "" or $sessionFromBearer){
 			if ( !isset($conf) ){
 				if ( isset($this->_conf['_auth']) ) $conf = $this->_conf['_auth'];
 				else $conf = array();
 			}
-			
+
 			$delegate =& $this->getDelegate();
 			if ( isset($delegate) and method_exists($delegate, 'startSession') ){
 				$delegate->startSession($conf);
 			} else {
-				
+
 				// path for cookies
 				$parts = parse_url(DATAFACE_SITE_URL);
 				$cookie_path = $parts['path'];
@@ -1644,14 +1899,14 @@ END
 						eval('$cookie_path = '.$cookie_path_expr.';');
 					}
 				}
-				
+
 				if (strlen($cookie_path)==0) $cookie_path = '/';
 				if ( $cookie_path{strlen($cookie_path)-1} != '/' ) $cookie_path .= '/';
-				
+
 				// timeout value for the cookie
 				$cookie_timeout = (isset($conf['session_timeout']) ? intval($conf['session_timeout']) : 0);
-				
-				
+
+
 				// timeout value for the garbage collector
 				//   we add 300 seconds, just in case the user's computer clock
 				//   was synchronized meanwhile; 600 secs (10 minutes) should be
@@ -1659,10 +1914,10 @@ END
 				//   cookie expires
 				if ( $cookie_timeout ){
 				    $garbage_timeout = $cookie_timeout + 600; // in seconds
-				
+
 				    // set the PHP session id (PHPSESSID) cookie to a custom value
 				    session_set_cookie_params($cookie_timeout, $cookie_path);
-				
+
 				    // set the garbage collector - who will clean the session files -
 				    //   to our custom timeout
 				    ini_set('session.gc_maxlifetime', $garbage_timeout);
@@ -1674,7 +1929,7 @@ END
 					//   clean sessions with our "own" garbage collector (which has a
 					//   custom timeout/maxlifetime set each time one of our scripts is
 					//   executed)
-					strstr(strtoupper(substr(@$_SERVER["OS"], 0, 3)), "WIN") ? 
+					strstr(strtoupper(substr(@$_SERVER["OS"], 0, 3)), "WIN") ?
 						$sep = "\\" : $sep = "/";
 					$sessdir = session_save_path(); //ini_get('session.save_path');
 					$levels = '';
@@ -1684,18 +1939,18 @@ END
 					}
 					if ( !$sessdir ) $sessdir = sys_get_temp_dir(); //'/tmp';
 					if ( $sessdir and $sessdir{strlen($sessdir)-1} == '/' ) $sessdir = substr($sessdir,0, strlen($sessdir)-1);
-					
+
 					if ( @$conf['subdir'] ) $subdir = $conf['subdir'];
 					else $subdir = md5(DATAFACE_SITE_PATH);
 					if ( !$subdir ) $subdir = 'dataface';
 					$sessdir .= "/".$subdir;
-					
-			
-					if (!is_dir($sessdir)) { 
+
+
+					if (!is_dir($sessdir)) {
 						$res = @mkdir($sessdir, 0777);
 						if ( !$res ){
 							error_log("Failed to create session directory '$sessdir' to store session files in ".__FILE__." on line ".__LINE__);
-							
+
 						}
 					}
 					if (is_dir($sessdir) ){
@@ -1711,8 +1966,11 @@ END
 				if ( @$conf['session_name'] ) session_name($conf['session_name']);
 				//echo "Starting session with ".session_name();
 				session_start();	// start the session
+				if (defined('REQUEST_PUBLIC_URL_USERNAME')) {
+					$_SESSION['UserName'] = REQUEST_PUBLIC_URL_USERNAME;
+				}
 				header('P3P: CP="IDC DSP COR CURa ADMa OUR IND PHY ONL COM STA"');
-				
+
 				// This updates the session timeout on page load
 				if ( $cookie_timeout and isset($_COOKIE[session_name()]) ){
 					setcookie(session_name(), $_COOKIE[session_name()], time() + $cookie_timeout, $cookie_path);
@@ -1721,23 +1979,23 @@ END
 		} else {
 			//echo "Session already started";
 		}
-		
+
 		if ( isset( $_SESSION['--msg'] ) ){
 			$this->addMessage($_SESSION['--msg']);
 			unset($_SESSION['--msg']);
 		}
-	
-	
+
+
 	}
-	
+
 	/**
 	 * @private
 	 */
 	function writeSessionData(){
-	
+
 		if ( isset($this->locations) ) $_SESSION['locations'] = serialize($this->locations);
 	}
-	
+
 	/**
 	 * @private
 	 */
@@ -1748,26 +2006,26 @@ END
 		$this->locations[$key] = $url;
 		return $key;
 	}
-	
+
 	/**
 	 * @private
 	 */
 	function decodeLocation($key){
 		if ( !isset($this->locations) and isset($_SESSION['locations']) ) $this->locations = unserialize($_SESSION['locations']);
 		else if ( !isset($this->locations) ) $this->locations = array();
-		
+
 		if ( isset($this->locations[$key]) ){
 			$url = $this->locations[$key];
 			unset($this->locations[$key]);
 			return $url;
-		
+
 		} else {
 			return null;
 		}
-	
+
 	}
-	 
-	 
+
+
 	 /**
 	 * @brief Obtains reference to the authentication tool.
 	 *
@@ -1777,26 +2035,26 @@ END
 	function &getAuthenticationTool(){
 		$null = null;
 		if ( !isset($this->authenticationTool) ){
-			
+
 			if ( isset($this->_conf['_auth']) ){
-				import('Dataface/AuthenticationTool.php');
+				import(XFROOT.'Dataface/AuthenticationTool.php');
 				$this->authenticationTool = Dataface_AuthenticationTool::getInstance($this->_conf['_auth']);
 			} else {
 				return $null;
 			}
 		}
-			
+
 		return $this->authenticationTool;
 	}
-	
-	
-	 
-	 
-	 
+
+
+
+
+
 	// @}
 	// END Session Handling
 	//=====================================================================================================
-	
+
 	// @{
 	/**
 	 * @name Template & UI Interaction
@@ -1805,8 +2063,8 @@ END
 	 * of content in the head of the document.
 	 *
 	 */
-	 
-	 
+
+
 	/**
 	 * @brief Adds some content meant to be inserted in the head of the application.
 	 * @param string $content
@@ -1817,7 +2075,7 @@ END
 	 * @code
 	 * $app->addHeadContent('<link rel="stylesheet" type="text/css" href="styles.css"/>');
 	 * @endcode
-	 * 
+	 *
 	 *
 	 * @attention If possible, you should try to use the @ref Dataface_JavascriptTool
 	 * class for adding javascripts and CSS stylesheets to your application's output.
@@ -1831,14 +2089,23 @@ END
 		$this->headContent[] = $content;
 	}
 	
+	private $bodyCSSClasses = array();
 	
+	function addBodyCSSClass($class) {
+		$this->bodyCSSClasses[] = $class;
+	}
+	
+	function getBodyCSSClasses() {
+		return implode(' ', $this->bodyCSSClasses);
+	}
+
 	/**
 	 * @brief Returns the nav item info for a key.  This is a wrapper around the nav items defined
 	 * in the [_tables] section of the conf.ini file.
 	 *
 	 * This can be overridden using the Application Delegate class method of the same name.
 	 *
-	 * @param string $key The key of the nav item.  This would be the table name if using the 
+	 * @param string $key The key of the nav item.  This would be the table name if using the
 	 *		traditional simple table nav items.
 	 *
 	 * @param string $label The label for the nav item.  This would be the table label if using
@@ -1869,8 +2136,8 @@ END
 			'selected' => $this->isNavItemSelected($key)
 		), $override);
 	}
-	
-	
+
+
 	/**
 	 * @brief Checks whether the specified nav item is currently selected.  This is used
 	 * by the default implementation of getNavItem() and it an be used also in
@@ -1884,7 +2151,7 @@ END
 	 *
 	 * @see getNavItem()
 	 * @see ApplicationDelegateClass::isNavItemSelected()
-	 *           
+	 *
 	 */
 	function isNavItemSelected($key){
 		$del =& $this->getDelegate();
@@ -1896,15 +2163,15 @@ END
 		$query =& $this->getQuery();
 		return ($query['-table'] == $key);
 	}
-	
-	
-	
+
+
+
 	/**
 	 * @brief Adds an error to be displayed in the UI in the messages block.
 	 * @param PEAR_Error $err The error that is being added.
 	 *
 	 * @returns void
-	 * 
+	 *
 	 * @see numErrors()
 	 * @see getErrors()
 	 * @see addMessage() To add string messages instead of Error objects.
@@ -1912,7 +2179,7 @@ END
 	function addError($err){
 		$this->errors[] = $err;
 	}
-	
+
 	/**
 	 * @brief Returns the number of errors that are to be displayed to the user in the
 	 * messages block.
@@ -1922,7 +2189,7 @@ END
 	 * @see getErrors()
 	 */
 	function numErrors(){ return count($this->errors); }
-	
+
 	/**
 	 * @brief Returns an array of the errors that are set to be displayed to the user
 	 * in the messages block.
@@ -1933,7 +2200,7 @@ END
 	function getErrors(){
 		return $this->errors;
 	}
-	
+
 	/**
 	 * @brief Adds a message to be displayed in the messages block.
 	 *
@@ -1945,9 +2212,9 @@ END
 	function addMessage($msg){
 		$this->messages[] = $msg;
 	}
-	
+
 	/**
-	 * @brief Gets the messages that are to be displayed in the messages block.  This 
+	 * @brief Gets the messages that are to be displayed in the messages block.  This
 	 * will look in multiple sources for possible messages to display.  It will include
 	 * the following:
 	 * -# $_SESSION['msg']
@@ -1970,7 +2237,7 @@ END
 		//print_r($msgs);
 		return $msgs;
 	}
-	
+
 	/**
 	 * @brief Clears all of the message to be displayed.
 	 * @returns void
@@ -1978,7 +2245,7 @@ END
 	function clearMessages(){
 		$this->messages = array();
 	}
-	
+
 	/**
 	 * @brief Returns the number of messages to be displayed to the user.
 	 * @returns int
@@ -1989,15 +2256,15 @@ END
 		if ( @$response['--msg'] ) $count++;
 		return $count;
 	}
-	
-	
+
+
 	/**
 	 * @brief Returns the response array used for compiling response.  The response may include
 	 * messages that need to be displayed to the screen as an alert.  Currently the response
 	 * array only includes a single key: --msg
 	 *
 	 * @returns array A response array with the following keys: @code
-	 *	--msg => <string> 
+	 *	--msg => <string>
 	 * @endcode
 	 *
 	 */
@@ -2008,22 +2275,22 @@ END
 		}
 		return $response;
 	}
-	 
-	 
+
+
 	// @}
 	// END Template & UI Interaction
 	//====================================================================================
-	
+
 	// {@
 	/**
 	 * @name Event Handling
 	 *
 	 * Methods for dealing with the dispatch of events.
 	 */
-	 
+
 	 private $firedEvents = array();
-	 
-	 
+
+
 	/**
 	 * @brief Fires an event to all event listeners.
 	 * @param string $name The name of the event. e.g. afterInsert
@@ -2037,18 +2304,21 @@ END
 		foreach ($listeners as $listener){
 			$res = call_user_func($listener, $params);
 			if ( PEAR::isError($res) ) return $res;
+            if ($params and ($params instanceof stdClass) and @$params->consumed) {
+                return $res;
+            }
 		}
 		$this->firedEvents[$name] = true;
 		return true;
 	}
-	
-	
-	
+
+
+
 	/**
 	 * @brief Registers an event listener to respond to events of a certain type.
 	 * @param string $name The name of the event to register for. e.g. afterInsert
 	 * @param mixed $callback A standard PHP callback.  Either a function name or an array of the form array(&$object,'method-name').
-	 * @param boolean $execImmediately If true, then this will execute the callback immediately 
+	 * @param boolean $execImmediately If true, then this will execute the callback immediately
 	 * if the specified event had already been fired.
 	 * @returns void.
 	 *
@@ -2064,8 +2334,8 @@ END
 			$this->eventListeners[$name][] = $callback;
 		}
 	}
-	
-	
+
+
 	/**
 	 * @brief Unregisters an event listener.
 	 *
@@ -2080,7 +2350,7 @@ END
 			}
 		}
 	}
-	
+
 	/**
 	 * @brief Gets a list of the callbacks that are registered for a given event.
 	 * @param $name The name of the event for which the callbacks are registered.
@@ -2094,15 +2364,15 @@ END
 			return array();
 		}
 	}
-	
-	 
-	 
+
+
+
 	// @}
 	// END Event Handling
 	//=====================================================================================
-	
-	
-	
+
+
+
 	// @{
 	/**
 	 * @name Request Handling
@@ -2110,9 +2380,9 @@ END
 	 * Methods for handling the main requests.  These methods are responsible for doing
 	 * the heaving lifting of displaying a page.
 	 */
-	 
-	 
-	 
+
+
+
 
 	/**
 	 * @brief Handle a request.  This method is the starting point for all Dataface application requests.
@@ -2124,7 +2394,7 @@ END
 	 *  -# If the current table's delegate class defines a handleRequest() method, then call that.
 	 *	-# If the current table's delegate class does not have a handleRequest() method or that method
 	 *		returns a PEAR_Error object with code E_DATAFACE_REQUEST_NOT_HANDLED, then check for a handler
-	 *		bearing the name of the action in one of the actions directories.  Check the directories 
+	 *		bearing the name of the action in one of the actions directories.  Check the directories
 	 *		in the following order:
 	 *		a. <site url>/tables/<table name>/actions
 	 *		b. <site url>/actions
@@ -2135,30 +2405,33 @@ END
 	 * @see ApplicationDelegateClass::beforeHandleRequest()
 	 */
 	function handleRequest($disableCache=false){
-		
-		
+
+
 		if ( !$disableCache and (@$_GET['-action'] != 'getBlob') and isset( $this->_conf['_output_cache'] ) and @$this->_conf['_output_cache']['enabled'] and count($_POST) == 0){
-			import('Dataface/OutputCache.php');
+			import(XFROOT.'Dataface/OutputCache.php');
 			$oc = new Dataface_OutputCache($this->_conf['_output_cache']);
 			$oc->ob_start();
-			
+
 		}
-		import('Dataface/ActionTool.php');
-		import('Dataface/PermissionsTool.php');
-		import('Dataface/Table.php');
-		
+		import(XFROOT.'Dataface/ActionTool.php');
+		import(XFROOT.'Dataface/PermissionsTool.php');
+		import(XFROOT.'Dataface/Table.php');
+
 		if ( isset($this->_conf['_modules']) and count($this->_conf['_modules']) > 0 ){
 			$mt = Dataface_ModuleTool::getInstance();
 			foreach ($this->_conf['_modules'] as $modname=>$modpath){
 				$mt->loadModule($modname);
-				
+
 			}
 		}
-		
+
 		// Set up security filters
 		$query =& $this->getQuery();
 		$table = Dataface_Table::loadTable($query['-table']);
-		
+        xf_script('xataface/actions/core.js');
+        // Ignore jquery because it is included in the head of the document
+        Dataface_JavascriptTool::getInstance()->ignore('jquery.packed.js');
+
 		if (@$this->_conf['using_default_action'] and $table->isSingleton()) {
 		    $query['-action'] = $this->_conf['default_browse_action'];
 		    $perms = $table->getPermissions();
@@ -2168,23 +2441,24 @@ END
 		    if (!isset($this->_conf['_prefs'])) {
 		        $this->_conf['_prefs'] = array();
 		    }
-		    
+
 		    // For singleton tables search is pointless
 		    $this->_conf['_prefs']['show_search'] = 0;
 		}
-		
+
 		if (!@$query['-sort'] and @$table->_atts['default_sort']) {
 		    $query['-sort'] = $table->_atts['default_sort'];
 		}
-		
+
 		$this->fireEvent('beforeHandleRequest');
 		$applicationDelegate = $this->getDelegate();
 		if ( isset($applicationDelegate) and method_exists($applicationDelegate, 'beforeHandleRequest') ){
 			// Do whatever we need to do before the request is handled.
 			$applicationDelegate->beforeHandleRequest();
 		}
-		
-		
+        
+        
+
 
 		//$table->setSecurityFilter();
 		/*
@@ -2198,34 +2472,43 @@ END
 		if ( @$this->_conf['hide_nav_menu'] ){
 			$this->prefs['show_tables_menu'] = 0;
 		}
-		
+
 		if ( @$this->_conf['hide_view_tabs'] ){
 			$this->prefs['show_table_tabs'] = 0;
 		}
-		
+
 		if ( @$this->_conf['hide_result_controller'] ){
 			$this->prefs['show_result_controller'] = 0;
 		}
-		
+
 		if ( @$this->_conf['hide_table_result_stats'] ){
 			$this->prefs['show_result_stats'] = 0;
 		}
-		
+
 		if ( @$this->_conf['hide_search'] ){
 			$this->prefs['show_search'] = 0;
 		}
-		
+
 		if ( !isset($this->prefs['disable_ajax_record_details']) ){
 			$this->prefs['disable_ajax_record_details'] = 1;
 		}
-		
+        if (!isset($this->prefs['mobile_nav_style'])) {
+            $this->prefs['mobile_nav_style'] = 'hamburger';
+        }
+
 		if ( $query['-action'] == 'login_prompt' ) $this->prefs['no_history'] = 1;
-		
-		
+
+
 		if ( isset($applicationDelegate) and method_exists($applicationDelegate, 'getPreferences') ){
 			$this->prefs = array_merge($this->prefs, $applicationDelegate->getPreferences());
 		}
-		$this->prefs = array_map('intval', $this->prefs);
+        foreach ($this->prefs as $k=>$v) {
+            if ($v === '0') {
+                $this->prefs[$k] = 0;
+            } else if ($v === '1') {
+                $this->prefs[$k] = 1;
+            }
+        }
 		
 		// Check to make sure that this table hasn't been disallowed
 		$disallowed = false;
@@ -2240,7 +2523,7 @@ END
 				}
 			}
 		}
-		
+
 		if ( $disallowed and isset($this->_conf['_allowed_tables']) ){
 			foreach ($this->_conf['_allowed_tables'] as $name=>$pattern ){
 				if ( $pattern{0} == '/' and preg_match($pattern, $query['-table']) ){
@@ -2252,8 +2535,8 @@ END
 				}
 			}
 		}
-		
-		
+
+
 		if ( $disallowed ){
 			return Dataface_Error::permissionDenied(
 				Dataface_LanguageTool::translate(
@@ -2263,17 +2546,39 @@ END
 					"Permission denied because this table has been disallowed in the conf.ini file '"
 				)
 			);
-			
+
 		}
-		
-		
+        
+
 		$actionTool = Dataface_ActionTool::getInstance();
-		
+
 		//if ( $this->_conf['multilingual_content'] ){
 			//import('I18Nv2/I18Nv2.php');
      		//I18Nv2::autoConv();
      	//}
-		
+
+        $record = $this->getRecord();
+        if ($record and $record->getTableAttribute('no_view_tab') and $query['-action'] == 'view') {
+            $relationshipActions = $record->table()->getRelationshipsAsActions();
+            $recordActions = $actionTool->getActions([
+                'record' => $record, 
+                'category' => 'record_tabs', 
+                'exclude' => 'edit view',
+                'actions' => $relationshipActions,
+                'with' => 'url'
+            ]);
+            
+            $recordActions = array_merge($recordActions, $relationshipActions);
+            if (count($recordActions) > 0) {
+                foreach ($recordActions as $recordAction) {
+
+                    header('Location: '.$recordAction['url']);
+                    exit;
+                }
+            }
+            
+        }
+
 		$params = array(
 			'table'=>$query['-table'],
 			'name'=>$query['-action']);
@@ -2291,7 +2596,7 @@ END
 				// This action is to be performed on the currently selected relationship.
 				$raction = $table->getRelationshipsAsActions(array(), $query['-relationship']);
 				if ( is_array($raction) ){
-					$action = array_merge($action,$raction); 
+					$action = array_merge($action,$raction);
 				}
 			}
 			if ( is_array($action) and isset($action['delegate']) ){
@@ -2300,20 +2605,20 @@ END
 				unset($action);
 				$action =& $tmp;
 				unset($tmp);
-			} 
+			}
 			if ( is_array($action) and isset($action['auth_type']) ){
 				$authTool = $this->getAuthenticationTool();
 				$authTool->setAuthType($action['auth_type']);
 			}
-			
+
 		}
-	
-	
+
+
 		if ( (PEAR::isError($action) or !@$action['permission']) and $this->_conf['security_level'] >= DATAFACE_STRICT_PERMISSIONS ){
-			
+
                         // The only reason getAction() will return an error is if the specified action could not be found.
 			// If the application is set to use strict permissions and no action was defined in the ini file
-			// then this action cannot be performed.  Strict permissions mode requires that permissions be 
+			// then this action cannot be performed.  Strict permissions mode requires that permissions be
 			// strictly set or permission will be denied.
 			return Dataface_Error::permissionDenied(
 				Dataface_LanguageTool::translate(
@@ -2322,21 +2627,21 @@ END
 					/* default error message */
 					"Permission denied for action '".
 						$query['-action'].
-					"'.  No entry for this action was found in the actions.ini file.  
-					You are currently using strict permissions mode which requires that you define all actions that you want to use in the actions.ini file with appropriate permissions information.", 
+					"'.  No entry for this action was found in the actions.ini file.
+					You are currently using strict permissions mode which requires that you define all actions that you want to use in the actions.ini file with appropriate permissions information.",
 					/* i18n parameters */
 					array('action'=>$query['-action'])
 				)
 			);
-			
-		} 
-		
+
+		}
+
 		else if ( PEAR::isError($action) ){
 			$action = array('name'=>$query['-action'], 'label'=>$query['-action']);
 		}
-		
+
 		// Step 1:  See if the delegate class has a handler.
-		
+
 		$delegate = $table->getDelegate();
 		$handled = false;
 		if ( method_exists($delegate,'handleRequest') ){
@@ -2350,16 +2655,16 @@ END
 			}
 		}
 		if ( isset($action['mode']) and $action['mode'] ) $query['-mode'] = $action['mode'];
-		
+
 		// Step 2: Look to see if there is a handler defined
 		if ( isset($action['custom']) ){
 			$locations = array( DATAFACE_PATH.'/actions/custom.php'=>'dataface_actions_custom');
 		} else {
 			$locations = array();
-			
+
 			$locations[ Dataface_Table::getBasePath($query['-table']).'/tables/'.basename($query['-table']).'/actions/'.basename($query['-action']).'.php' ] = 'tables_'.$query['-table'].'_actions_'.$query['-action'];
 			$locations[ DATAFACE_SITE_PATH.'/actions/'.basename($query['-action']).'.php' ] = 'actions_'.$query['-action'];
-			
+
 			if ( isset($this->_conf['_modules']) and count($this->_conf['_modules']) > 0 ){
 				$mt = Dataface_ModuleTool::getInstance();
 				foreach ($this->_conf['_modules'] as $modname=>$modpath){
@@ -2372,15 +2677,15 @@ END
 					}
 				}
 			}
-			
+
 			$locations[ DATAFACE_PATH.'/actions/'.basename($query['-action']).'.php' ] = 'dataface_actions_'.$query['-action'];
 			$locations[ DATAFACE_PATH.'/actions/default.php' ] = 'dataface_actions_default';
-				
+
 		}
 		$doParams = array('action'=>&$action);
 			//parameters to be passed to the do method of the handler
-			
-		
+
+
 		foreach ($locations as $handlerPath=>$handlerClassName){
 			if ( is_readable($handlerPath) ){
 				import($handlerPath);
@@ -2393,24 +2698,24 @@ END
 					// check the permissions on this action to make sure that we are 'allowed' to perform it
 					// this method will return an array of Strings that are names of permissions granted to
 					// the current user.
-					
-					
+
+
 					//echo "Checking permissions:";
 					//print_r($params);
 					$permissions = $handler->getPermissions($params);
 				//} else if ( $applicationDelegate !== null and method_exists($applicationDelegate, 'getPermissions') ){
 				//	$permissions =& $applicationDelegate->getPermissions($params);
-					
-			
-				
+
+
+
 				} else {
 					//print_r($params);
 					//print_r($action);
 					$permissions = $this->getPermissions($params);
 				}
-				
+
 				if ( isset($action['permission']) && !(isset($permissions[$action['permission']]) and $permissions[$action['permission']]) ){
-				
+
                                     if ( !$permissions ){
                                         return Dataface_Error::permissionDenied(df_translate(
                                             "Permission Denied for action no permissions",
@@ -2420,69 +2725,100 @@ END
                                             array('action' => $action)
                                         ));
                                     } else {
-                                    
+
                                         return Dataface_Error::permissionDenied(
                                                     Dataface_LanguageTool::translate(
                                                             "Permission Denied for action.", /*i18n id*/
                                                             /* Default error message */
                                                             "Permission to perform action '".
                                                             $action['name'].
-                                                            "' denied.  
+                                                            "' denied.
                                                             Requires permission '".
                                                             $action['permission'].
                                                             "' but only granted '".
-                                                            Dataface_PermissionsTool::namesAsString($permissions)."'.", 
+                                                            Dataface_PermissionsTool::namesAsString($permissions)."'.",
                                                             /* i18n parameters */
                                                             array('action'=>$action, 'permissions_granted'=>Dataface_PermissionsTool::namesAsString($permissions))
                                                     )
                                             );
                                     }
-				
+
 				}
-				
+
 				if ( method_exists($handler, 'handle') ){
-					
-					
+
+
 					$result = $handler->handle($doParams);
 					if ( PEAR::isError($result) and $result->getCode() === DATAFACE_E_REQUEST_NOT_HANDLED ){
 						continue;
 					}
 					return $result;
 				}
-				
-				
+
+
 			}
-			
+
 		}
-		
+
 		throw new Exception(df_translate('scripts.Dataface.Application.handleRequest.NO_HANDLER_FOUND',"No handler found for request.  This should never happen because, at the very least, the default handler at dataface/actions/default.php should be called.  Check the permissions on dataface/actions/default.php to make sure that it is readable by the web server."), E_USER_ERROR);
-		
-		
-		
-	
+
+
+
+
 	}
-	 
+
 	 function display($main_content_only=false, $disableCache=false){
 		try {
 			$this->_display($main_content_only, $disableCache);
-	 		
+
 	 	} catch ( Exception $ex){
-	 		echo '<p>Uncaught exception was thrown while processing this request.  Troubleshooting steps:</p> 
-	 		    <ol>
-	 			<li><a href="'.htmlspecialchars($this->url('').'&--refresh-apc=1').'">Refresh the APC Cache.</a> - This may help in cases where you have changed a table column definition and your server has the APC opcode cache installed.</li>
-	 			<li><a href="'.htmlspecialchars($this->url('-action=clear_views')).'">Clear Cache Views</a> - This may also help in cases where you have changed a table column definition and some tables include __sql__ definitions.</li>
-	 			<li>Check your PHP error log for a description of the error and go from there.  See <a href="http://xataface.com/wiki/Troubleshooting">this page</a> for troubleshooting tips.</li>
-	 			</ol>';
-	 		  
-			throw $ex;
-			
+			$query = $this->getQuery();
+			if (@$query['-response'] === 'json') {
+				$uuid = df_error_log($ex);
+				header('Content-type: application/json; charset="'.$this->_conf['oe'].'"');
+				$resp = array(
+					'code' => '500', 
+					'message' => 'Internal server error.  Check error log for details',
+					'uuid' => $uuid
+				);
+				$errorMessage = 'Check error log for details.';
+				$errorCode = $ex->getCode();
+				if ($ex instanceof \xf\core\XFException) {
+					$errorMessage = $ex->getClientErrorMessage();
+					$errorCode = $ex->getClientErrorCode();
+				}
+				$resp['errorMessage'] = $errorMessage;
+				$resp['errorCode'] = $errorCode;
+				echo json_encode($resp);
+				exit;
+			}
+			if ($ex->getCode() == DATAFACE_E_NOTICE) {
+				df_display(array('body'=>'<div class="portalMessageWrapper"><div class="responsive-content"><div class="portalMessage"><ul><li>'.htmlspecialchars($ex->getMessage()).'</li></ul></div></div></div>'), 'Dataface_Main_Template.html');
+				return;
+			}
+			$uuid = df_error_log($ex);
+			header('HTTP/1.0 500 Internal Server Error', true);
+
+			echo "<!doctype html>
+				<html>
+					<head><title>Internal Error</title></head>
+				<body>
+					<h1>Internal Server Error</h1>
+					<p>Check your error log for details.</p>
+					<p>$uuid</p>
+					<p><a href='".htmlspecialchars(DATAFACE_SITE_HREF)."'>Home</a></p>
+
+				</body>
+				</html>
+			";
+	 		
 	 	}
 	 }
-	 
+
 	/**
 	 * @brief Displays the Dataface application.
 	 *
-	 * @param boolean $main_content_only Whether to only show the main content or to show the full page with header and 
+	 * @param boolean $main_content_only Whether to only show the main content or to show the full page with header and
 	 *		footer.  This parameter is not respected by many of the current templates and may be removed in later releases.
 	 *
 	 * @param boolean $disableCache Whether to disable the output cache.  It is enabled by default.
@@ -2497,7 +2833,7 @@ END
 		foreach ($this->_tables as $key=>$value){
 			$this->_tables[$key] = $this->_conf['_tables'][$key] = df_translate('tables.'.$key.'.label', $value);
 		}
-		
+
 		$this->main_content_only = $main_content_only;
 		if ( $this->autoSession or $this->sessionEnabled() or @$_REQUEST['--enable-sessions']){
 			$this->startSession();
@@ -2520,22 +2856,22 @@ END
 				if ( !@$_SESSION['XATAFACE_REMOTE_ADDR'] ){
 					$_SESSION['XATAFACE_REMOTE_ADDR'] = df_IPv4To6($_SERVER['REMOTE_ADDR']);
 				}
-				
+
 			}
 		}
 		// handle authentication
 		if ( !(defined('XATAFACE_DISABLE_AUTH') and XATAFACE_DISABLE_AUTH) and isset($this->_conf['_auth']) ){
 			// The config file _auth section is there so we will be using authentication.
-	
+
 			$loginPrompt = false;	// flag to indicate if we should show the login prompt
 			$permissionDenied = false;// flag to indicate if we should show permission denied
 			$permissionError = ''; //Placeholder for permissions error messages
 			$loginError = ''; // Placeholder for login error messages.
-			
+
 			$authTool = $this->getAuthenticationTool();
-			
+
 			$auth_result = $authTool->authenticate();
-			
+
 			if ( PEAR::isError($auth_result) and $auth_result->getCode() == DATAFACE_E_LOGIN_FAILURE ){
 				// There was a login failure, show the login prompt
 				$loginPrompt = true;
@@ -2565,20 +2901,20 @@ END
 				if ( Dataface_Error::isPermissionDenied($result) ){
 					// The user did not have permission to perform the action
 					// Give the user a login prompt.
-					
+
 					$loginPrompt = true;
 				}
-				
+
 			}
 			if ( $loginPrompt ){
 				// The user is supposed to see a login prompt to log in.
 				// Show the login prompt.
-				header("HTTP/1.1 401 Unauthorized");
+				//header("HTTP/1.1 401 Unauthorized");
 				$authTool->showLoginPrompt($loginError);
 			} else if ($permissionDenied) {
 				// The user is supposed to see the permissionm denied page.
 				$query =& $this->getQuery();
-				
+
 				if ( $query['--original_action'] == 'browse' and $query['-action'] != 'view' ){
 					$this->redirect($this->url('-action=view'));
 				}
@@ -2588,17 +2924,17 @@ END
 			} else if ( PEAR::isError($result) ){
 				// Some other error occurred in handling the request.  Just show an
 				// ugly stack trace.
-				
+
 				throw new Exception($result->toString().$result->getDebugInfo(), E_USER_ERROR);
 			}
 		} else {
 			// Authentication is not enabled for this application.
 			// Just process the request.
-			
+
 			$result = $this->handleRequest($disableCache);
 			if ( Dataface_Error::isPermissionDenied($result) ){
 				$query =& $this->getQuery();
-				
+
 				if ( $query['--original_action'] == 'browse' and $query['-action'] != 'view' ){
 					$this->redirect($this->url('-action=view'));
 				}
@@ -2606,13 +2942,13 @@ END
 				header("HTTP/1.1 403 Permission Denied");
 				df_display(array(), 'Dataface_Permission_Denied.html');
 			} else if ( PEAR::isError($result) ){
-				
+
 				throw new Exception($result->toString().$result->getDebugInfo(), E_USER_ERROR);
 			}
 		}
-	
+
 	}
-	
+
 	/**
 	 *
 	 * @brief Blob requests are ones that only want the content of a blob field in the database.
@@ -2623,24 +2959,24 @@ END
 	 * @private
 	 */
 	function _handleGetBlob($request){
-		import('Dataface/Application/blob.php');
+		import(XFROOT.'Dataface/Application/blob.php');
 		return Dataface_Application_blob::_handleGetBlob($request);
 	}
-	
-	 
+
+
 	// @}
 	// END Request Handling
 	//======================================================================================
-	
-	
+
+
 	// @{
 	/**
 	 * @name Utility Functions
 	 *
-	 * Useful functions that are informed by the current context to provide useful 
+	 * Useful functions that are informed by the current context to provide useful
 	 * functionality to the application as a whole.
 	 */
-	
+
 	var $_parseStringContext=array();
 	/**
 	 * @brief Evaluates a string expression replacing PHP variables with appropriate values
@@ -2651,7 +2987,7 @@ END
 	 *
 	 * @par Example expressions:
 	 *		'${site_href}?-table=Profiles&ProfileID==${ProfileID}'
-	 *			-- in the above example, ${site_href} would be replaced with the url (including 
+	 *			-- in the above example, ${site_href} would be replaced with the url (including
 	 *				script name) of the site, and ${ProfileID} would be replaced with
 	 *				the value of the ProfileID field in the current record.
 	 *
@@ -2663,7 +2999,7 @@ END
 	 *		<tr>
 	 *			<td>$site_url</td><td>String</td>
 	 *			<td>The Site URL (i.e. DATAFACE_SITE_URL).  This includes the URL
-	 *				to the folder containing the application.  It doesn't include the 
+	 *				to the folder containing the application.  It doesn't include the
 	 *				index.php file.
 	 *			</td>
 	 *		</tr>
@@ -2687,13 +3023,13 @@ END
 	 *		</tr>
 	 *		<tr>
 	 *			<td>$query</td><td>array</td>
-	 *			<td>The current query array.  
+	 *			<td>The current query array.
 	 *				See @ref getQuery()
 	 *			</td>
 	 *		</tr>
 	 *		<tr>
 	 *			<td>$resultSet</td><td>@ref Dataface_QueryTool</td>
-	 *			<td>The current query result set.  
+	 *			<td>The current query result set.
 	 *				See @ref getResultSet()
 	 *			</td>
 	 *		</tr>
@@ -2719,11 +3055,12 @@ END
 					array('expression'=>$expression))
 					, E_USER_ERROR);
 		}
- 
+
 		$site_url = DATAFACE_SITE_URL;
 		$site_href = DATAFACE_SITE_HREF;
 		$dataface_url = DATAFACE_URL;
 		$table = $this->_currentTable;
+		$authTool = Dataface_AuthenticationTool::getInstance();
 		$tableObj = Dataface_Table::loadTable($table);
 		if ( PEAR::isError($tableObj) ){
 			throw new Exception($tableObj->getMessage(), $tableObj->getCode());
@@ -2737,10 +3074,10 @@ END
 		} else {
 			$record = $app->getRecord();
 		}
-		
+
 		if ( isset($context['relationship']) ){
 			//$tableObj = Dataface_Table::loadTable($table);
-			
+
 			if ( is_string($context['relationship']) ){
 				$relationship = $tableObj->getRelationship($context['relationship']);
 				if ( !($relationship instanceof Dataface_Relationship) ){
@@ -2756,15 +3093,15 @@ END
 		} else {
 			eval('$parsed = "'.$expression.'";');
 		}
-		
+
 		if ( !isset( $parsed ) ){
 			throw new Exception(df_translate('scripts.Dataface.Application.parseString.ERROR_PARSING_EXPRESSION',"Error parsing expression '$expression'. ", array('expression'=>$expression)), E_USER_ERROR);
 		}
 		return $parsed;
-	
+
 	}
-	
-	
+
+
 	/**
 	 * Used by preg_replace_callback to replace a match with its PHP parsed equivalent.
 	 * @private
@@ -2777,8 +3114,8 @@ END
 			return eval('return '.$matches[1].$matches[2].';');
 		}
 	}
-	
-	
+
+
 	/**
 	 * @brief Tests an expression for a boolean result.  This is primarly used
 	 * by the condition directive of actions to be able to evaluate boolean expressions
@@ -2797,7 +3134,7 @@ END
 	 *		<tr>
 	 *			<td>$site_url</td><td>String</td>
 	 *			<td>The Site URL (i.e. DATAFACE_SITE_URL).  This includes the URL
-	 *				to the folder containing the application.  It doesn't include the 
+	 *				to the folder containing the application.  It doesn't include the
 	 *				index.php file.
 	 *			</td>
 	 *		</tr>
@@ -2821,13 +3158,13 @@ END
 	 *		</tr>
 	 *		<tr>
 	 *			<td>$query</td><td>array</td>
-	 *			<td>The current query array.  
+	 *			<td>The current query array.
 	 *				See @ref getQuery()
 	 *			</td>
 	 *		</tr>
 	 *		<tr>
 	 *			<td>$resultSet</td><td>@ref Dataface_QueryTool</td>
-	 *			<td>The current query result set.  
+	 *			<td>The current query result set.
 	 *				See @ref getResultSet()
 	 *			</td>
 	 *		</tr>
@@ -2858,7 +3195,8 @@ END
 		$resultSet = $app->getResultSet();
 		if ( isset($context['record']) ) $record = $context['record'];
 		else $record = $app->getRecord();
-		
+        $related_record = @$context['related_record'];
+
 		if ( isset($context['relationship']) ){
 			//$tableObj =& Dataface_Table::loadTable($table);
 			if ( is_string($context['relationship'])  ){
@@ -2878,9 +3216,9 @@ END
 			return eval('return ('.$condition.');');
 		}
 	}
-	
-	
-	
+
+
+
 	/**
 	 * @brief Builds a link to somewhere in the application.  This will maintain the existing
 	 * query information.
@@ -2891,7 +3229,7 @@ END
 	 * @see Dataface_LinkTool::buildLink()
 	 *
 	 * @par Example Using Query Array
-	 * Given that the current page is located at 
+	 * Given that the current page is located at
 	 * http://example.com/path/to/app/index.php?-table=foo&-action=bar&username=ted
 	 * @code
 	 * echo $app->url(array('-action'=>'browse'));
@@ -2902,29 +3240,48 @@ END
 	 * @endcode
 	 *
 	 * (Actually this isn't entirely correct... the entire context will also be included
-	 * and Xataface calculates some default context parameters at the beginning of 
+	 * and Xataface calculates some default context parameters at the beginning of
 	 * every request so the actually result will include parameters like -skip, -limit, -cursor,
 	 * etc.. as well).
 	 *
 	 */
 	function url($query, $useContext=true, $forceContext=false){
-		import('Dataface/LinkTool.php');
+		import(XFROOT.'Dataface/LinkTool.php');
 		return Dataface_LinkTool::buildLInk($query, $useContext, $forceContext);
-	
+
 	}
-	
-	
-		
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
+
+    /**
+     * Gets a table attribute.  Table attributes are defined in the fields.ini file in the global
+     * scope.  They can be overridden in the delegate class via the attribute__attname methods.
+     * @since 3.0
+     */
+    function getTableAttribute($attname) {
+        $query = $this->getQuery();
+        $table = Dataface_Table::loadTable($query['-table']);
+        
+        $del = $table->getDelegate();
+        $method = 'attribute__'.$attname;
+        if ($del and method_exists($del, $method)) {
+            $out = $del->$method($this);
+            if (isset($out)) {
+                return $out;
+            }
+        }
+        return @$table->_atts[$attname];
+    }
+
+
+
+
+
+
+
 	/**
-	 * @brief Registers a filter that acts on URLs that are build with link builder. 
+	 * @brief Registers a filter that acts on URLs that are build with link builder.
 	 * This allows modules to affect URLs as they are built to add, remove, or change
 	 * parameters.
 	 *
@@ -2943,7 +3300,7 @@ END
 	 * }
 	 * $app = Dataface_Application::getInstance();
 	 * $app->registerUrlFilter('addFoo');
-	 * 
+	 *
 	 * // Now any URL produced will include &-foo=1 at the end of it
 	 * $url = $app->url('');
 	 *     // Outputs index.php?-table=test&-action=list&-foo=1
@@ -2954,8 +3311,8 @@ END
 	function registerUrlFilter( $filter ){
 		$this->_url_filters[] = $filter;
 	}
-	
-	
+
+
 	/**
 	 * @brief Filters a URL to add the current table and apply any filters
 	 * that have been registered using registerUrlFilter()
@@ -2973,24 +3330,24 @@ END
 				$url .= '?-table='.$this->_currentTable;
 			}
 		}
-		
+
 		foreach ($this->_url_filters as $filter){
 			$url = call_user_func($filter, $url);
 		}
 		return $url;
-	
+
 	}
-	
-	
-	
+
+
+
 	/**
-	 * @private 
+	 * @private
 	 */
 	function init(){
-	
+
 	}
-	
-	
+
+
 	/**
 	 * @brief Redirects the browser to a particular URL.  Using this method
 	 * rather than using a Location HTTP header directly is preferred as it allows
@@ -3010,24 +3367,24 @@ END
 		}
 		header('Location: '.$url);
 		exit;
-		
+
 	}
-	
+
 	// @}
 	// End Utility Functions
 	//=======================================================================================
-	
-	
-	
+
+
+
 	// @{
 	/**
 	 * @name Delegate Class
 	 *
 	 * Methods for obtaining and working with the delegate class.
 	 */
-	 
-	 
-	 
+
+
+
 	/**
 	 * @brief Returns a reference to the delegate object for this application.
 	 * The delegate object can be used to define custom functionality for the application.
@@ -3047,12 +3404,12 @@ END
 			}
 		}
 		return $this->delegate;
-				
+
 	}
-	
-	
-	 
-	 
+
+
+
+
 	// END Delegate Class
 	// @}
 	//========================================================================================
@@ -3064,12 +3421,12 @@ END
 	 *
 	 * Method wrappers for working with permissions.
 	 */
-	 
-	 
-	
+
+
+
 	/**
-	 * @brief Returns the permissions that are currently available to the user in the current 
-	 * context.  If we are in browse mode then permissions are checked against the 
+	 * @brief Returns the permissions that are currently available to the user in the current
+	 * context.  If we are in browse mode then permissions are checked against the
 	 * current record.  Otherwise, permissions are checked against the table.
 	 *
 	 * This will first try to get the permissions on the current record (as retrieved via
@@ -3098,9 +3455,9 @@ END
 			//$params = array();
 			return Dataface_PermissionsTool::getPermissions($table, $params);
 		}
-		
+
 	}
-	
+
 	/**
 	 * @brief Checks if a permission is granted in the current context.
 	 *
@@ -3119,16 +3476,16 @@ END
 		$result = (isset($perms[$perm]) and $perms[$perm]);
 		return $result;
 	}
-	
-	
-	 
-	 
+
+
+
+
 	// @}
 	// END Permissions
 	//=========================================================================================
-	
-	
-	
+
+
+
 	/**
 	 *  @brief Updates the metadata tables to make sure that they are current.
 	 * Meta data tables are tables created by dataface to enrich the database.
@@ -3147,14 +3504,14 @@ END
 			$metadataTool->updateWorkflowTable($tablename);
 		}
 	}
-	
-	
-	
-	
-	
+
+
+
+
+
 	/**
 	 * @brief Parses a request to obtain a related blob object.
-	 * @private 
+	 * @private
 	 * Requests can ask for a related record's blob field.  When this happens
 	 * it has to be converted to a normal blob request.
 	 *
@@ -3162,10 +3519,10 @@ END
 	 * @return array
 	 */
 	function _parseRelatedBlobRequest($request){
-		import('Dataface/Application/blob.php');
+		import(XFROOT.'Dataface/Application/blob.php');
 		return Dataface_Application_blob::_parseRelatedBlobRequest($request);
 	}
-	
+
 
 	//@{
 	/**
@@ -3174,21 +3531,21 @@ END
 	 * Methods for working with custom pages.  These are seldom used and are not
 	 * the recommended way to make actions in Xataface.
 	 */
-	 
-	 
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
+
+
+
 	/**
-	 * @brief PHP files located in the 'pages' directory of the site are considered to be 
+	 * @brief PHP files located in the 'pages' directory of the site are considered to be
 	 * custom pages.  Passing the GET parameter -action=custom_<pagename> will cause
 	 * the Application controller to display the page <pagename>.php from the pages
-	 * directory.  This method just returns an array of full paths to the custom 
+	 * directory.  This method just returns an array of full paths to the custom
 	 * pages that are available in the 'pages' directory.
 	 *
 	 * @return array Array of all of the pages in the pages directory that can be
@@ -3205,7 +3562,7 @@ END
 						if ( preg_match('/\.php$/', $file) ){
 							list($name) = explode('.', $file);
 							//$name = str_replace('_', ' ', $name);
-							
+
 							$this->_customPages[$name] = $path.$file;
 						}
 					}
@@ -3214,7 +3571,7 @@ END
 		}
 		return $this->_customPages;
 	}
-	
+
 	/**
 	 * @brief Obtains the full path (read for inclusion) of the custom page with name $name
 	 *
@@ -3226,7 +3583,7 @@ END
 		$pages =& $this->getCustomPages();
 		return $pages[$name];
 	}
-	
+
 	/**
 	 * @brief Obtains the label for a custom page.  The label is the same as the name except
 	 * with capitalization of words and replacement of underscores with spaces.
@@ -3239,14 +3596,14 @@ END
 		$name = str_replace('_',' ', $name);
 		return ucwords($name);
 	}
-	
+
 
 	// @}
 	// END Custom Pages
 	//=====================================================================================
 
 
-	
+
 	/**
 	 * @brief Adds debug info to the debug log.
 	 * @private
@@ -3255,7 +3612,7 @@ END
 	function addDebugInfo($info){
 		$this->debugLog[] = $info;
 	}
-	
+
 	/**
 	 * @brief Displays info from the debug log.
 	 * @private
@@ -3266,7 +3623,7 @@ END
 		'; echo implode('</li><li>', $this->debugLog);
 		echo '</li></ul>';
 	}
-	
+
 	/**
 	 * @private
 	 */
@@ -3278,19 +3635,19 @@ END
 			@xf_db_query('COMMIT', $this->_db);
 		}
 	}
-	
-	
 
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
 
 }
 
 /**
- * @brief An exception class that is raised when the application is requesting to 
+ * @brief An exception class that is raised when the application is requesting to
  * redirect to a different URL.
  */
 class Dataface_Application_RedirectException extends Exception {
@@ -3299,10 +3656,9 @@ class Dataface_Application_RedirectException extends Exception {
 		$this->url = $url;
 		parent::__construct('Request to redirect to '.$url, $code, $previous);
 	}
-	
+
 	public function getURL(){
 		return $this->url;
 	}
 
 }
-

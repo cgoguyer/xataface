@@ -26,7 +26,7 @@
  * @created February 9, 2007
  *
  */
-import('Dataface/QuickForm.php');
+import(XFROOT.'Dataface/QuickForm.php');
 class dataface_actions_copy_replace {
 	var $message = "";
 	var $renderer = null;
@@ -52,6 +52,10 @@ class dataface_actions_copy_replace {
 			$records =& df_get_records_array($query['-table'], $q);
 		}
 		
+		if (count($records) == 0) {
+			throw new Exception("You cannot copy or update an empty result set", DATAFACE_E_NOTICE);
+		}
+		
 		
 		// Now we find out a few things, like whether we're doing a related record
 		// list or the real list
@@ -60,6 +64,7 @@ class dataface_actions_copy_replace {
 		
 		$field_options = array(0=>df_translate('actions.copy_replace.options.select_field_to_change','Select field to change...'));
 		foreach ($fields as $field){
+		    if ( $field['widget']['type'] == 'hidden' ) continue;
 			$field_options[$field['name']] = $field['widget']['label'];
 		}
 		
@@ -190,11 +195,9 @@ END
 	}	
 	
 	function addFields(&$form, &$fields){
-	
 		$app=& Dataface_Application::getInstance();
 		$query =& $app->getQuery();
 		$this->renderer =& $form->defaultRenderer();
-		
 		foreach (array_keys($fields) as $fieldname){
 			if ( $fields[$fieldname]['widget']['type'] == 'hidden' ) continue;
 			$builder =& $this->getTableForm($fields[$fieldname]['tablename']);
@@ -262,7 +265,7 @@ END
 	
 	function process($values){
 		$app =& Dataface_Application::getInstance();
-		import('Dataface/CopyTool.php');
+		import(XFROOT.'Dataface/CopyTool.php');
 		$copyTool =& Dataface_CopyTool::getInstance();
 		$query =& $app->getQuery();
 		//if ( @$values['-copy_replace:copy'] ){

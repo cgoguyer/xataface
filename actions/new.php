@@ -3,17 +3,17 @@
  *
  *  Xataface Web Application Framework for PHP and MySQL
  *  Copyright (C) 2006  Steve Hannah <shannah@sfu.ca>
- *  
+ *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
  *  License as published by the Free Software Foundation; either
  *  version 2.1 of the License, or (at your option) any later version.
- *  
+ *
  *  This library is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  *  Lesser General Public License for more details.
- *  
+ *
  *  You should have received a copy of the GNU Lesser General Public
  *  License along with this library; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
@@ -31,33 +31,47 @@
  */
 class dataface_actions_new {
 	function handle(){
-		import( 'Dataface/FormTool.php');
-		import( 'Dataface/QuickForm.php');
+		import( XFROOT.'Dataface/FormTool.php');
+		import( XFROOT.'Dataface/QuickForm.php');
 		$formTool =& Dataface_FormTool::getInstance();
 		$app =& Dataface_Application::getInstance();
 		$query =& $app->getQuery();
 		
+		$app->addBodyCSSClass('no-table-tabs');
+        $app->addBodyCSSClass('no-mobile-header');
+        $app->addBodyCSSClass('no-fab');
 		$new = true;
-		
+
                 $includedFields = null; // Null for all fields
-                
+
                 if ( @$query['-fields'] ){
                     $includedFields = explode(' ', $query['-fields']);
                 }
-                
+
 		$currentRecord = new Dataface_Record($query['-table'], array());
 		$currentTable =& Dataface_Table::loadTable($query['-table']);
+		if (!$currentTable or PEAR::isError($currentTable)) {
+			die("No such table");
+		}
 		
+		if (!$_POST) {
+			$newRecordTableName = $currentTable->getNewRecordFormTable();
+			if ($newRecordTableName != $currentTable->tablename) {
+				header('Location: '.$app->url(array('-table' => $newRecordTableName), true, true));
+				exit;
+			}
+		}
+
 		$app->setPageTitle(
 		    df_translate(
-		        'actions.new.label', 
+		        'actions.new.label',
 		        'New '.$currentTable->getSingularLabel(),
 		        array(
 		            'tableObj'=>$currentTable
 		        )
 		    )
 		);
-		
+
 		if ( !isset($query['--tab']) and count($currentTable->tabs($currentRecord)) > 1 ){
 		   $tabs = $currentTable->tabs($currentRecord);
 		   uasort($tabs, array($formTool, '_sortTabs'));
@@ -65,19 +79,21 @@ class dataface_actions_new {
 		} else if ( count($currentTable->tabs($currentRecord)) <= 1 ){
 			unset($query['--tab']);
 		}
-		
+
 		$form = $formTool->createRecordForm($currentRecord, true, @$query['--tab'], $query, $includedFields);
-		
-		
+		if (@$query['-format'] == 'xml') {
+			$form->xml = true;
+		}
+
 		//$form = new Dataface_QuickForm($query['-table'], $app->db(),  $query, '',$new);
 		$res = $form->_build();
 		if ( PEAR::isError($res) ){
 			error_log($res->toString().Dataface_Error::printStackTrace());
 			throw new Exception("Error occurred while building the new record form.  See error log for details.", E_USER_ERROR);
-			
-		
+
+
 		}
-		$formTool->decorateRecordForm($currentRecord, $form, true, @$query['--tab']);	
+		$formTool->decorateRecordForm($currentRecord, $form, true, @$query['--tab']);
 		/*
 		 *
 		 * We need to add the current GET parameter flags (the GET vars starting with '-') so
@@ -88,20 +104,20 @@ class dataface_actions_new {
 			if ( strpos($key,'-')===0 ){
 				$form->addElement('hidden', $key);
 				$form->setDefaults( array( $key=>$value) );
-				
+
 			}
 		}
-				
+
 		/*
-		 * Store the current query string (the portion after the '?') in the form, so we 
+		 * Store the current query string (the portion after the '?') in the form, so we
 		 * can retrieve it after and redirect back to our original location.
 		 */
 		$form->addElement('hidden', '-query');
 		$form->setDefaults( array( '-action'=>$query['-action'],'-query'=>$_SERVER['QUERY_STRING']) );
-				
-				
+
+
 		/*
-		 * 
+		 *
 		 * We have to deal with 3 cases.
 		 * 	1) The form has not been submitted.
 		 *	2) The form was submitted but didn't validate (ie: it had some bad input)
@@ -110,28 +126,45 @@ class dataface_actions_new {
 		 * We deal with Case 3 first...
 		 *
 		 */
-			
+
 		if ( $formTool->validateRecordForm($currentRecord, $form, true, @$query['--tab']) ){
-			
 			/*
 			 *
 			 * The form was submitted and it validated ok.  We now process it (ie: save its contents).
 			 *
 			 */
 			$formTool->handleTabSubmit($currentRecord, $form, @$query['--tab']);
-			if ( !isset($query['--tab']) ){
-				// If we aren't using tabs we just do it the old way.
-				// (If it ain't broke don't fix it
-				$result = $form->process( array( &$form, 'save') );
-			} else {
-				// If we are using tabs, we will use the formtool's 
-				// session aware saving function
-				$result = $formTool->saveSession($currentRecord, true);
-			}
+			try {
+				if ( !isset($query['--tab']) ){
+					// If we aren't using tabs we just do it the old way.
+					// (If it ain't broke don't fix it
+					$result = $form->process( array( &$form, 'save') );
+				} else {
+					// If we are using tabs, we will use the formtool's
+					// session aware saving function
+					$result = $formTool->saveSession($currentRecord, true);
+				}
+			} catch (xf\core\XFException $ex) {
+				if (@$query['-response'] === 'json') {
+					throw $ex;
+				} else {
+					$result = PEAR::raiseError($ex->getMessage(), $ex->getCode());
+				}
 			
+			} catch (Exception $ex) {
+				if (@$query['-response'] === 'json') {
+					throw $ex;
+				} else {
+					if (Dataface_Error::isNotice($ex)) {
+						$result = PEAR::raiseError($ex->getMessage(), $ex->getCode());
+					} else {
+						throw $ex;
+					}
+				}
+			}
+
 			$success = true;
 			$response =& Dataface_Application::getResponse();
-			
 			if ( !$result ){
 				throw new Exception("Error occurred in save: ".xf_db_error( $app->db()), E_USER_ERROR);
 			} else if ( PEAR::isError($result) && !Dataface_Error::isNotice($result) ){
@@ -139,7 +172,11 @@ class dataface_actions_new {
 				if ( Dataface_Error::isDuplicateEntry($result) ){
 					$success = false;
 					$form->_errors[] = $result->getMessage();
-					
+					if (@$query['-response'] == 'json') {
+						import(XFROOT.'xf/core/XFException.php');
+						throw new xf\core\XFException('Failed to insert record.  Duplicate record.', $result->getCode(), new Exception($result->getMessage(), $result->getCode()));
+					}
+
 				} else {
 					//echo "not dup entry"; exit;
 					//echo "Not dup entry";
@@ -149,13 +186,17 @@ class dataface_actions_new {
 
 				}
 			} else if ( Dataface_Error::isNotice($result) ){
-			
+
 				$app->addError($result);
 				$success = false;
+				if (@$query['-response'] == 'json') {
+					import(XFROOT.'xf/core/XFException.php');
+					throw new xf\core\XFException('Failed to insert record', $result->getCode(), new Exception($result->getMessage(), $result->getCode()));
+				}
 			}
-			
+
 			if ( $success){
-				
+
 				if (@$query['-response'] == 'json' ){
 					//header('Content-type: application/json; charset="'.$app->_conf['oe'].'"');
 					$rvals = $currentRecord->strvals();
@@ -164,11 +205,11 @@ class dataface_actions_new {
 					echo json_encode(array('response_code'=>200, 'record_data'=> $rvals, 'response_message'=>df_translate('Record Successfully Saved', 'Record Successfully Saved')));
 					return;
 				}
-				import('Dataface/Utilities.php');
-				
-				
+				import(XFROOT.'Dataface/Utilities.php');
+
+
 				Dataface_Utilities::fireEvent('after_action_new', array('record'=>$currentRecord));
-					
+
 				/*
 				 *
 				 * Since the form created a new record, then it makes more sense to redirect to this newly
@@ -178,30 +219,47 @@ class dataface_actions_new {
 				 */
 				//$query = $form->_record->getValues(array_keys($form->_record->_table->keys()));
 				$currentRecord->secureDisplay = false;
-				if ( $currentRecord->checkPermission('edit') ){
-					$nextAction = 'edit';
+                $newAction = Dataface_ActionTool::getInstance()->getAction(array('name'=>'new'));
+                if (@$newAction['after_action.'.$query['-table']]) {
+					$nextAction = $newAction['after_action_'.$query['-table']];
+				} else if (@$newAction['after_action']) {
+					$nextAction = $newAction['after_action'];
+                    
 				} else {
+				    $nextAction = 'edit';
+				}
+                $nextActionConfig = Dataface_ActionTool::getInstance()->getAction(array('name'=>$nextAction));
+                $perm = '';
+                if ($nextActionConfig and @$nextActionConfig['permission']) {
+                    $perm = $nextActionConfig['permission'];
+                }
+				if ( $perm and !$currentRecord->checkPermission($perm) ){
 					$nextAction = 'view';
 				}
-                                $urlParams = array('-action'=>$nextAction);
-                                
-                                // Some parameters we'll want to pass to our edit action
-                                // so that the edit form is consistent with the display
-                                // of the new form.  E.g. if the form was headless or 
-                                // has only particular fields, then the edit form should
-                                // include the same fields and also be headless.
-                                $passedParams = array('-fields', '-headless','-xf-hide-fields');
-                                foreach ( $passedParams as $passedParam ){
-                                    if (@$query[$passedParam]){
-                                        $urlParams[$passedParam] = $query[$passedParam];
-                                    }
-                                }
-				$url = $currentRecord->getURL($urlParams);
-                                if ( @$query['--lang'] ){
-                                    $url .= '&--lang='.$query['--lang'];
-                                }
-				//echo $url;exit;
+				$urlParams = array('-action'=>$nextAction);
+
+				// Some parameters we'll want to pass to our edit action
+				// so that the edit form is consistent with the display
+				// of the new form.  E.g. if the form was headless or
+				// has only particular fields, then the edit form should
+				// include the same fields and also be headless.
+				$passedParams = array('-fields', '-headless','-xf-hide-fields');
+				foreach ( $passedParams as $passedParam ){
+					if (@$query[$passedParam]){
+						$urlParams[$passedParam] = $query[$passedParam];
+					}
+				}
 				
+				if ($currentRecord->getInsertedRecordId()) {
+					$currentRecord = df_get_record_by_id($currentRecord->getInsertedRecordId());
+				}
+				
+				$url = $currentRecord->getURL($urlParams);
+				if ( @$query['--lang'] ){
+					$url .= '&--lang='.$query['--lang'];
+				}
+				//echo $url;exit;
+
 				$msg = implode("\n", $app->getMessages());//@$response['--msg'];
 				$msg = urlencode(trim(
 					Dataface_LanguageTool::translate(
@@ -211,35 +269,72 @@ class dataface_actions_new {
 						"Record successfully saved."
 					)."\n".$msg));
 				if ( strpos($url, '?') === false ) $url .= '?';
-				$link = $url.'&--saved=1&--msg='.$msg; 
+				$link = $url.'&--saved=1&--msg='.$msg;
                                 //echo "$link";exit;
+                                
+                                
+                
 				$app->redirect("$link");
-				
+
 			} else {
-                            $app->addHeadContent('<meta id="quickform-error" name="quickform-error" value="Save failed"/>');
-                        }
-		
+				$app->addHeadContent('<meta id="quickform-error" name="quickform-error" value="Save failed"/>');
+			}
+
 		}
-		
+
+
+
 		ob_start();
 		$form->setDefaults($_GET);
 		$form->display();
 		$out = ob_get_contents();
 		ob_end_clean();
-		
+
+
+
 		if ( count($form->_errors) > 0 ){
 			//$app->clearMessages();
 			//$app->addError(PEAR::raiseError("Some errors occurred while processing this form: <ul><li>".implode('</li><li>', $form->_errors)."</li></ul>"));
+			if (@$query['-response'] == 'json') {
+				import(XFROOT.'xf/core/XFException.php');
+				$messages = implode('. ', $form->_errors);
+				throw new xf\core\XFException('Failed to insert record.'.$messages, DATAFACE_E_VALIDATION_CONSTRAINT_FAILED, new Exception($messages, DATAFACE_E_VALIDATION_CONSTRAINT_FAILED));
+			}
 		}
-		
+		if (@$query['-format'] == 'xml') {
+			header('Content-type: application/xml; charset="'.$app->_conf['oe'].'"');
+			$doc = new DOMDocument();
+			$doc->preserveWhiteSpace = false;
+			$doc->formatOutput = true;
+			$doc->loadXML($out);
+			echo $doc->saveXML();
+
+			exit;
+		}
 		$context = array('form'=>&$out);
 		$context['tabs'] = $formTool->createHTMLTabs($currentRecord, $form, @$query['--tab']);
+		$context['new_record_header_label'] = 'Create new '.$currentTable->getSingularLabel();
+		if (@$currentTable->_atts['new_record_label']) {
+			$context['new_record_header_label'] = $currentTable->_atts['new_record_label'];
+		}
+		if (@$currentTable->_atts['new_record_label_html']) {
+			$context['new_record_header_label_html'] = $currentTable->_atts['new_record_label_html'];
+		}
 		
-                
+		
+		$context['new_record_header_description'] = "";
+		if (@$currentTable->_atts['new_record_description']) {
+			$context['new_record_header_description'] = $currentTable->_atts['new_record_description'];
+		}
+		if (@$currentTable->_atts['new_record_description_html']) {
+			$context['new_record_header_description_html'] = $currentTable->_atts['new_record_description_html'];
+		}
+		
                 if ( isset($query['-template']) ) $template = $query['-template'];
                 else if ( @$query['-headless'] ) $template = 'Dataface_New_Record_headless.html';
 		else $template = 'Dataface_New_Record.html';
-                
+
+		Dataface_JavascriptTool::getInstance()->import('xataface/widgets/depends.js');
 		df_display($context, $template, true);
 	}
 }

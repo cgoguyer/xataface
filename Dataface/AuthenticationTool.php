@@ -26,7 +26,7 @@
  * Description:
  *	Handles authentication for Dataface application.
  */
-import('Dataface/Table.php');
+import(XFROOT.'Dataface/Table.php');
 class Dataface_AuthenticationTool {
 
 	var $authType = 'basic';
@@ -76,7 +76,7 @@ class Dataface_AuthenticationTool {
 		return $instance;
 	}
 	
-	function Dataface_AuthenticationTool($params=array()){
+	function __construct($params=array()){
 		$this->conf = $params;
 		$this->usersTable = ( isset($params['users_table']) ? $params['users_table'] : null);
 		$this->usernameColumn = ( isset($params['username_column']) ? $params['username_column'] : null);
@@ -85,6 +85,7 @@ class Dataface_AuthenticationTool {
 		
 		$this->setAuthType(@$params['auth_type']); 
 	}
+		function Dataface_AuthenticationTool($params=array()) { self::__construct($params); }
 	
 	function setAuthType($type){
 		if ( isset( $type ) and $type != $this->authType ){
@@ -107,6 +108,89 @@ class Dataface_AuthenticationTool {
 			}
 			
 		} 
+	}
+	
+	/**
+	 * Stores an array of string groups that the current user belongs to.
+	 */
+	var $groups = null;
+	
+	/**
+	 * The column that the groups are stored in.
+	 */
+	var $groupsColumn = null;
+	
+	/**
+	 * Optionally if the groups are stored in another table, this is the name of 
+	 * the relationship to obtain the groups.  This relationship would be on the 
+	 * users table.
+	 *
+	 * If $groupsColumn is set, then it refers to a field in the relationship
+	 * which will be used to identify the group name.  Otherwise it will use
+	 * the record title.
+	 */
+	var $groupsRelationship = null;
+	
+	/**
+	 * Returns array of group names that the currently logged in user belongs to.  This 
+	 * requires that one of the following is true:
+	 *
+	 * <ol>
+	 *   <li>The Application delegate implements a method called getGroups() that returns
+	 *      the groups as an array of strings.</li>
+	 *   <li>The [_auth] section of the conf.ini file includes a "groups_column"
+	 *      directive that points to the field of the users table that includes the 
+	 *      groups.  This column would either be a SET column, or a comma-delimited VARCHAR
+	 *      field.
+	 *   </li>
+	 *   <li>The [_auth] section of the conf.ini file includes a "groups_relationship" 
+	 *      directive that refers to the name of a relationship on the users table that 
+	 *      involves the groups.  If the groups_column directive is also specified, then
+	 *      it will refer to the column in the relationship that has the group name.
+	 *      otherwise it will just user the record title.
+	 *  </li>
+	 * </ol>
+	 */
+	function getGroups() {
+	    if (!isset($this->groups)) {
+	        $app =& Dataface_Application::getInstance();
+	        $appdel = $app->getDelegate();
+	        if (isset($appdel) and method_exists($appdel, 'getGroups')) {
+	            $this->groups = $appdel->getGroups();
+	        }
+	        if (!isset($this->groups) and isset($this->groupsRelationship)) {
+	            $user = $this->getLoggedInUser();
+	            if ($user) {
+	                $groups = array();
+	                $rrecords = $user->getRelatedRecordObjects($this->groupsRelationship);
+	                foreach ($rrecords as $rrec) {
+	                    if (isset($this->groupsColumn)) {
+	                        $groups[] = $rrec->val($this->groupsColumn);
+	                    } else {
+	                        $groups[] = $rrec->toRecord()->getTitle();
+	                    }
+	                }
+	                
+	            }
+	        }
+	        if (!isset($this->groups) and isset($this->groupsColumn)) {
+	            $user = $this->getLoggedInUser();
+	            if ($user) {
+	                $val = $user->val($this->groupsColumn);
+	                if ($val and is_array($val)) {
+	                    $this->groups = $val;
+	                } else if ($val and is_string($val)) {
+	                    $this->groups = explode(',', $val);
+	                } else {
+	                    $this->groups = array();
+	                }
+	            } else {
+	                $this->groups = array();
+	            }
+	        }
+	        
+	    }
+	    return $this->groups;
 	}
 	
 	function getCredentials(){
@@ -133,7 +217,7 @@ class Dataface_AuthenticationTool {
 				//throw new Exception("Username or Password Not specified", E_USER_ERROR);
 				return false;
 			}
-			import('Dataface/Serializer.php');
+			import(XFROOT.'Dataface/Serializer.php');
 			$serializer = new Dataface_Serializer($this->usersTable);
 			//$res = xf_db_query(
 			$sql =	"SELECT `".$this->usernameColumn."` FROM `".$this->usersTable."`
@@ -186,6 +270,13 @@ class Dataface_AuthenticationTool {
 		}
 	}
 
+	function createToken() {
+		if (session_id() == '') {
+			return null;
+		}
+		return md5('sessid').'.'.base64_encode(session_id());
+	}
+
 	function authenticate(){
 		$app =& Dataface_Application::getInstance();
 		if ( !$this->authEnabled ) return true;
@@ -194,6 +285,9 @@ class Dataface_AuthenticationTool {
 		if ( $app->sessionEnabled() or $app->autoSession ){
 			$app->startSession($this->conf);
 		}
+		
+		
+		
 		$appdel =& $app->getDelegate();
 		
 		// Fire a trigger before we authenticate
@@ -212,7 +306,15 @@ class Dataface_AuthenticationTool {
 			$username = @$_SESSION['UserName'];
 			session_destroy();
 			
-			import('Dataface/Utilities.php');
+			if (@$_REQUEST['--no-prompt']) {
+			    df_write_json(array(
+			        'code' => 200,
+			        'message' => "Logged out successfully"
+			    ));
+			    exit;
+			}
+			
+			import(XFROOT.'Dataface/Utilities.php');
 				
 			Dataface_Utilities::fireEvent('after_action_logout', array('UserName'=>$username));
 			
@@ -235,33 +337,67 @@ class Dataface_AuthenticationTool {
 		}
 		
 		if ( isset( $_REQUEST['-action'] ) and $_REQUEST['-action'] == 'login' ){
+			
+			$json = @$_REQUEST['--no-prompt'];
 			$app->startSession();
 			if ( $this->isLoggedIn() ){
-				$app->redirect(DATAFACE_SITE_HREF.'?--msg='.urlencode("You are logged in"));
-
+				if ($json) {
+					df_write_json(array(
+						'code' => 200,
+						'token' => $this->createToken(),
+						'message' => 'Logged in'
+					));
+					exit;
+				} else {
+					$app->redirect(DATAFACE_SITE_HREF.'?--msg='.urlencode("You are logged in"));
+				}
 			}
 			
 			if ( $this->isLockedOut() ){
-				$app->redirect(DATAFACE_SITE_HREF.'?--msg='.urlencode("Sorry, you are currently locked out of the site due to failed login attempts.  Please try again later, or contact a system administrator for help."));
+				if ($json) {
+					df_write_json(array(
+						'code' => '400',
+						'message' => 'Too many failed attempts.  Locked out.'
+					));
+					exit;
+				} else {
+					$app->redirect(DATAFACE_SITE_HREF.'?--msg='.urlencode("Sorry, you are currently locked out of the site due to failed login attempts.  Please try again later, or contact a system administrator for help."));
+				}
 
 			}
 			// The user is attempting to log in.
 			$creds = $this->getCredentials();
 			$approved = $this->checkCredentials();
-			
 			if ( isset($creds['UserName']) and !$approved ){
 				
 				$this->flagFailedAttempt($creds);
-				
-				return PEAR::raiseError(
-					df_translate('Incorrect Password',
-							'Sorry, you have entered an incorrect username /password combination.  Please try again.'
-							),
-					DATAFACE_E_LOGIN_FAILURE
+				if ($json) {
+					df_write_json(array(
+						'code' => 400,
+						'message' => df_translate('Incorrect Password',
+								'Sorry, you have entered an incorrect username /password combination.  Please try again.'
+								)
+					));
+					exit;
+				} else {
+					return PEAR::raiseError(
+						df_translate('Incorrect Password',
+								'Sorry, you have entered an incorrect username /password combination.  Please try again.'
+								),
+						DATAFACE_E_LOGIN_FAILURE
 					);
-			} else if ( !$approved ){
+				}
 				
-				$this->showLoginPrompt();
+			} else if ( !$approved ){
+				if ($json) {
+					df_write_json(array(
+						'code' => 500,
+						'message' => 'No UserName provided.'
+					));
+				} else {
+					$this->showLoginPrompt();
+				}
+				
 				exit;
 			}
 			
@@ -271,16 +407,30 @@ class Dataface_AuthenticationTool {
 			// userid in the session.
 			$_SESSION['UserName'] = $creds['UserName'];
 			
-			import('Dataface/Utilities.php');
+			if ($json) {
+				df_write_json(array(
+					'code' => 200,
+					'token' => $this->createToken(),
+					'message' => 'Logged in'
+				));
+				exit;
+			}
+			
+			import(XFROOT.'Dataface/Utilities.php');
 				
 			Dataface_Utilities::fireEvent('after_action_login', array('UserName'=>$_SESSION['UserName']));
 			$msg = df_translate('You are now logged in','You are now logged in');
-			if ( isset( $_REQUEST['-redirect'] ) and !empty($_REQUEST['-redirect']) ){
+			if ( isset( $_REQUEST['-redirect'] ) and 
+					!empty($_REQUEST['-redirect']) and 
+					strpos($_REQUEST['-redirect'], '-action=login_prompt&') === false
+				){
 				
 				$redirect = df_append_query($_REQUEST['-redirect'], array('--msg'=>$msg));
 				//$app->redirect($redirect);
 
-			} else if ( isset($_SESSION['-redirect']) ){
+			} else if ( isset($_SESSION['-redirect']) and !empty($_SESSION['-redirect']) and
+					strpos($_SESSION['-redirect'], '-action=login_prompt&') === false
+			){
 				$redirect = $_SESSION['-redirect'];
 				unset($_SESSION['-redirect']);
 				$redirect = df_append_query($redirect, array('--msg'=>$msg));
@@ -288,7 +438,7 @@ class Dataface_AuthenticationTool {
 
 			} else {
 			// Now we forward to the homepage:
-				$redirect = $_SERVER['HOST_URI'].DATAFACE_SITE_HREF;
+				$redirect = df_append_query($_SERVER['HOST_URI'].DATAFACE_SITE_HREF, array('--msg'=>$msg));
 			}
 			
 			$redirect = preg_replace('/-action=login_prompt/', '', $redirect);
@@ -359,7 +509,6 @@ class Dataface_AuthenticationTool {
 		if ( isset($this->delegate) and method_exists($this->delegate, 'showLoginPrompt') ){
 			return $this->delegate->showLoginPrompt($msg);
 		}
-		header("HTTP/1.1 401 Please Log In");
 		
 		$url = $app->url('-action=login_prompt');
 		
@@ -468,7 +617,7 @@ class Dataface_AuthenticationTool {
 	
 	function getEmailColumn(){
 		if ( !isset($this->emailColumn) ){
-			import('Dataface/Ontology.php');
+			import(XFROOT.'Dataface/Ontology.php');
 			Dataface_Ontology::registerType('Person', 'Dataface/Ontology/Person.php', 'Dataface_Ontology_Person');
 			$ontology = Dataface_Ontology::newOntology('Person', $this->usersTable);
 			if ( isset($this->conf['email_column']) ) $this->emailColumn = $this->conf['email_column'];

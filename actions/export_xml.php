@@ -1,8 +1,8 @@
 <?php
-import('Dataface/XMLTool.php');
+import(XFROOT.'Dataface/XMLTool.php');
 class dataface_actions_export_xml {
 	function handle(&$params){
-		import('Dataface/XMLTool/default.php');
+		import(XFROOT.'Dataface/XMLTool/default.php');
 		$xml = new Dataface_XMLTool_default();
 		$xml->expanded = true;
 		
@@ -33,7 +33,10 @@ class dataface_actions_export_xml {
 			}
 		
 		} else {
-			$records = df_get_records_array($query['-table'], $query,null,null,false);
+		    $records = df_get_selected_records($query);
+		    if (!$records) {
+			    $records = df_get_records_array($query['-table'], $query,null,null,false);
+			}
 			foreach ($records as $record){
 				if ( $record->checkPermission('view xml') ){
 					$input[] = $record;

@@ -78,7 +78,7 @@ class Smarty_Compiler extends Smarty {
     /**
      * The class constructor.
      */
-    function Smarty_Compiler()
+    function __construct()
     {
         // matches double quoted strings:
         // "foobar"
@@ -212,6 +212,7 @@ class Smarty_Compiler extends Smarty {
         $this->_func_call_regexp = '(?:' . $this->_func_regexp . '\s*(?:'
            . $this->_parenth_param_regexp . '))';
     }
+        function Smarty_Compiler() { self::__construct(); }
 
     /**
      * compile a resource
@@ -262,6 +263,7 @@ class Smarty_Compiler extends Smarty {
         reset($this->_folded_blocks);
 
         /* replace special blocks by "{php}" */
+        
         $source_content = preg_replace_callback($search, create_function ('$matches', "return '" 
                                        . $this->_quote_replace($this->left_delimiter) . 'php' 
                                        . "' . str_repeat(\"\n\", substr_count('\$matches[1]', \"\n\")) .'" 

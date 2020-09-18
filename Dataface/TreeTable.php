@@ -1,5 +1,5 @@
 <?php
-import('Dataface/ResultList.php');
+import(XFROOT.'Dataface/ResultList.php');
 /**
  * A tree table for displaying records in a heirarchical view.
  *
@@ -25,10 +25,11 @@ class Dataface_TreeTable {
 	 * @param Dataface_Record $record The root record.
 	 * @param string $relationship The name of the relationship.
 	 */
-	function Dataface_TreeTable(&$record, $relationship=null){
+	function __construct(&$record, $relationship=null){
 		$this->record =& $record;
 		$this->relationship = $relationship;
 	}
+		function Dataface_TreeTable(&$record, $relationship=null) { self::__construct($record, $relationship); }
 	
 	/**
 	 * Returns the Dataface_Record object that belongs at the given row id.
@@ -263,7 +264,7 @@ class Dataface_TreeTable {
 		echo $this->getSubrowsAsHTML('',$depth,$treetableid);
 		
 		echo "</tbody></table>";
-		import('Dataface/ActionTool.php');
+		import(XFROOT.'Dataface/ActionTool.php');
 		$actionsTool =& Dataface_ActionTool::getInstance();
 		$actions = $actionsTool->getActions(array('category'=>'selected_records_actions'));
 		if (count($actions)>0 ){
@@ -285,7 +286,7 @@ class Dataface_TreeTable {
 			echo "<input type=\"submit\" value=\"Submit\"/>";
 		}
 		
-		import('Dataface/Utilities.php');
+		import(XFROOT.'Dataface/Utilities.php');
 		
 		// We need to build a query.
 		$q = array('-table'=>$this->record->_table->tablename);
@@ -295,7 +296,7 @@ class Dataface_TreeTable {
 		$q['-relationship'] = $this->relationship;
 		
 		echo Dataface_Utilities::query2html($q, array('-action'));
-		echo '<input type="hidden" name="-redirect" value="'.$_SERVER['REQUEST_URI'].'"/>';
+		echo '<input type="hidden" name="-redirect" value="'.df_escape($_SERVER['REQUEST_URI']).'"/>';
 		echo "</form>";
 		echo "
 		<script language=\"javascript\" type=\"text/javascript	\"><!--

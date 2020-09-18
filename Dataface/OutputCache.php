@@ -26,7 +26,7 @@ class Dataface_OutputCache {
 	 */
 	var $usedTables=array();
 	
-	function Dataface_OutputCache($params=array()){
+	function __construct($params=array()){
 		if ( !extension_loaded('zlib') ){
 			$this->useGzipCompression = false;
 		} else if ( isset($params['useGzipCompression']) ){
@@ -44,6 +44,7 @@ class Dataface_OutputCache {
 		
 		if ( !$this->_cacheTableExists() ) $this->_createCacheTable();
 	}
+		function Dataface_OutputCache($params=array()) { self::__construct($params); }
 	
 	function getUserId(){
 		if ( !isset($this->userId) ){
@@ -70,7 +71,7 @@ class Dataface_OutputCache {
 	 * of pages from the database.
 	 */
 	function _buildPageSelect($params=array()){
-		import('Dataface/AuthenticationTool.php');
+		import(XFROOT.'Dataface/AuthenticationTool.php');
 		$query =& $this->app->getQuery();
 		
 		

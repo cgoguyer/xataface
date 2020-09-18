@@ -1,6 +1,7 @@
 {use_macro file="Dataface_Main_Template.html"}
 
 	{fill_slot name="main_column"}
+		<div class="responsive-content">
 		<h2>{translate id="Manage output cache"}Manage output cache{/translate}</h2>
 		<p>{translate id="manage_output_cache.description_paragraph"}The Dataface output cache stores copies of the pages of this application as they
 		are presented to the user.  Each time a page is requested, Dataface first checks the 
@@ -27,7 +28,7 @@
 				   refreshed.  However if you make changes to the source files on the file system
 				   (e.g. the fields.ini files or delegate classes), you will need to empty the
 				   cache manually using this option{/translate}:</p>
-				<p><form action="{$smarty.server.PHP_SELF}" method="post">
+				<p><form action="{$smarty.server.PHP_SELF|escape}" method="post">
 					<input type="hidden" name="-action" value="manage_output_cache"/>
 					<input type="hidden" name="--clear-cache" value="1"/>
 					<input type="submit" name="Clear" value="{translate id="Clear Cache Now"}Clear Cache Now{/translate}"/>
@@ -36,5 +37,6 @@
 			</li>
 		</ul>
 		{/if}
+	</div>
 	{/fill_slot}
 {/use_macro}

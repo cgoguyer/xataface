@@ -52,9 +52,10 @@ class Dataface_TranslationTool {
 		TRANSLATION_STATUS_EXTERNAL => 'Managed Externally'
 		);
 		
-	function Dataface_TranslationTool() {
+	function __construct() {
 	
 	}
+		function Dataface_TranslationTool() { self::__construct(); }
 	
 	/**
 	 * Returns a string containing an HTML select list for selecting the 
@@ -442,7 +443,7 @@ END;
 		list($major_version,$minor_version) = explode('.', $version);
 		$trecord = $this->getTranslationRecord($record, $lang);
 		
-		import('Dataface/HistoryTool.php');
+		import(XFROOT.'Dataface/HistoryTool.php');
 		$ht = new Dataface_HistoryTool();
 		
 		$hrecord = $ht->searchArchives($trecord, array('major_version'=>$major_version, 'minor_version'=>$minor_version), $lang);
@@ -463,8 +464,8 @@ END;
 	 */
 	function migrateDefaultLanguage($newDefault, $tables=null){
 		
-		import('Dataface/Utilities.php');
-		import('Dataface/IO.php');
+		import(XFROOT.'Dataface/Utilities.php');
+		import(XFROOT.'Dataface/IO.php');
 		$app = Dataface_Application::getInstance();
 		$no_fallback = @$app->_conf['default_language_no_fallback'];
 			// Whether or not the application is currently set to disable fallback
@@ -614,7 +615,7 @@ END;
 				
 		}
 		if ( !@$msg ) return;
-		import('Dataface/ActionTool.php');
+		import(XFROOT.'Dataface/ActionTool.php');
 		$at = Dataface_ActionTool::getInstance();
 		$actions = $at->getActions(array('category'=>'translation_warning_actions','record_id'=>$record->getId()));
 		$actions_html = "<ul class=\"translation_options\">";

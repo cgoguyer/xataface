@@ -1,5 +1,5 @@
 <?php
-import('Dataface/Table.php');
+import(XFROOT.'Dataface/Table.php');
 
 /**
  * Handles the building of database tables and their associated configuration
@@ -41,7 +41,7 @@ class Dataface_Table_builder {
 	
 	var $fields=array();
 	
-	function Dataface_Table_builder($name){
+	function __construct($name){
 		$app =& Dataface_Application::getInstance();
 		$this->name = $name;
 		if ( xf_db_num_rows(xf_db_query('show tables like \''.addslashes($name).'\'', $app->db())) > 0 ){
@@ -49,6 +49,7 @@ class Dataface_Table_builder {
 		}
 	
 	}
+		function Dataface_Table_builder($name) { self::__construct($name); }
 	
 	function createPrimaryKey(){
 		foreach ($this->fields as $field){
